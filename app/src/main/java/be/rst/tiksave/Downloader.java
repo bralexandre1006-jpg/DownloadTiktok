@@ -45,53 +45,86 @@ public class Downloader {
         return common / (double) Math.min(cap.size(), t.size());
     }
 
-    private static JSONObject get(String url) throws Exception {
-        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
-        con.setRequestProperty("User-Agent", UA);
-        con.setConnectTimeout(15000);
-        con.setReadTimeout(20000);
-        StringBuilder sb = new StringBuilder();
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
-            String l;
-            while ((l = r.readLine()) != null) sb.append(l);
-        }
-        return new JSONObject(sb.toString());
+    public static long parseCount(String s) {
+        Matcher m = Pattern.compile("(\\d[\\d\\s\\u00a0\\u202f.,]*)\\s*([KkMm])?(?![\\p{L}])").matcher(s);
+        if (!m.find()) return -1;
+        String n = m.group(1).replaceAll("[\\s\\u00a0\\u202f]", "");
+        String suf = m.group(2);
+        try {
+            if (suf == null) return Long.parseLong(n.replaceAll("[.,]", ""));
+            double v = Double.parseDouble(n.replace(',', '.'));
+            return Math.round(v * (suf.equalsIgnoreCase("k") ? 1_000 : 1_000_000));
+        } catch (Exception e) { return -1; }
     }
 
-    public static void fromScreen(Context ctx, java.util.List<String> users, String caption) {
+    private static boolean near(long screen, long api) {
+        if (screen < 0 || api < 0) return false;
+        double tol = screen >= 10_000 ? Math.max(screen * 0.03, 100) : Math.max(screen * 0.03, 3);
+        return Math.abs(screen - api) <= tol;
+    }
+
+    private static JSONObject post(String method, String query) throws Exception {
+        Exception last = null;
+        for (String base : new String[]{"https://tikwm.com/api/", "https://www.tikwm.com/api/"}) {
+            try {
+                HttpURLConnection con = (HttpURLConnection) new URL(base + method + "?" + query).openConnection();
+                con.setRequestMethod("POST");
+                con.setDoOutput(true);
+                con.setRequestProperty("User-Agent", UA);
+                con.setRequestProperty("Accept", "application/json");
+                con.setConnectTimeout(15000);
+                con.setReadTimeout(20000);
+                con.getOutputStream().close();
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
+                    String l;
+                    while ((l = r.readLine()) != null) sb.append(l);
+                }
+                return new JSONObject(sb.toString());
+            } catch (Exception e) { last = e; }
+        }
+        throw last;
+    }
+
+    public static void fromScreen(Context ctx, java.util.List<String> users, String caption, long[] st) {
         Context c = ctx.getApplicationContext();
         Handler h = new Handler(Looper.getMainLooper());
-        log(c, "users=" + users + " | caption=" + caption);
+        log(c, "users=" + users + " | caption=" + caption + " | stats=" + java.util.Arrays.toString(st));
         if (users.isEmpty()) { toast(h, c, "Pseudo introuvable à l'écran"); result(false); return; }
         new Thread(() -> {
             java.util.Set<String> cap = words(caption);
             String bestUser = null, bestId = null;
             double best = 0;
+            int known = 0;
+            for (long v : st) if (v >= 0) known++;
             try {
                 outer:
-                for (int u = 0; u < Math.min(users.size(), 3); u++) {
+                for (int u = 0; u < Math.min(users.size(), 2); u++) {
                     String user = users.get(u);
                     String cursor = "0";
-                    for (int page = 0; page < 3; page++) {
-                        JSONObject j = get("https://www.tikwm.com/api/user/posts?count=35&unique_id="
-                                + URLEncoder.encode(user, "UTF-8") + "&cursor=" + cursor);
-                        Thread.sleep(1100);
+                    for (int page = 0; page < 4; page++) {
+                        JSONObject j = post("user/posts", "unique_id=" + URLEncoder.encode(user, "UTF-8")
+                                + "&count=35&cursor=" + cursor);
                         log(c, "posts " + user + " p" + page + " code=" + j.optInt("code", -1) + " msg=" + j.optString("msg"));
-                        if (j.optInt("code", -1) != 0) break;
+                        if (j.optInt("code", -1) != 0) { Thread.sleep(1100); break; }
                         JSONObject d = j.getJSONObject("data");
                         JSONArray vids = d.optJSONArray("videos");
                         if (vids == null || vids.length() == 0) break;
                         for (int i = 0; i < vids.length(); i++) {
                             JSONObject v = vids.getJSONObject(i);
-                            double s = score(cap, v.optString("title", ""));
-                            if (s > best) { best = s; bestUser = user; bestId = v.optString("video_id"); }
+                            int hits = 0;
+                            if (near(st[0], v.optLong("digg_count", -1))) hits++;
+                            if (near(st[1], v.optLong("comment_count", -1))) hits++;
+                            if (near(st[2], v.optLong("share_count", -1))) hits++;
+                            double cs = score(cap, v.optString("title", ""));
+                            double sc = hits + cs;
+                            boolean ok = hits >= 2 || (hits >= 1 && cs >= 0.5) || cs >= 0.75 || (known == 1 && hits == 1);
+                            if (ok && sc > best) { best = sc; bestUser = user; bestId = v.optString("video_id"); }
                         }
-                        if (best >= 0.75) break outer;
-                        if (cap.isEmpty() && bestId == null) {
-                            bestUser = user; bestId = vids.getJSONObject(0).optString("video_id");
-                        }
+                        if (best >= 2.5 || (known > 0 && best >= known)) break outer;
                         if (!d.optBoolean("hasMore", false)) break;
                         cursor = d.optString("cursor", "0");
+                        Thread.sleep(1100);
                     }
                 }
             } catch (Exception e) {
@@ -101,8 +134,8 @@ public class Downloader {
                 return;
             }
             log(c, "best=" + best + " user=" + bestUser + " id=" + bestId);
-            if (bestId == null || (!cap.isEmpty() && best < 0.4)) {
-                toast(h, c, "Vidéo introuvable (debug dans Téléchargements)");
+            if (bestId == null) {
+                toast(h, c, "Vidéo introuvable");
                 result(false);
                 return;
             }
@@ -131,17 +164,7 @@ public class Downloader {
         toast(h, c, "Récupération de la vidéo…");
         new Thread(() -> {
             try {
-                HttpURLConnection con = (HttpURLConnection) new URL(
-                        "https://www.tikwm.com/api/?hd=1&url=" + URLEncoder.encode(url, "UTF-8")).openConnection();
-                con.setRequestProperty("User-Agent", UA);
-                con.setConnectTimeout(15000);
-                con.setReadTimeout(20000);
-                StringBuilder sb = new StringBuilder();
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
-                    String l;
-                    while ((l = r.readLine()) != null) sb.append(l);
-                }
-                JSONObject j = new JSONObject(sb.toString());
+                JSONObject j = post("", "hd=1&url=" + URLEncoder.encode(url, "UTF-8"));
                 if (j.optInt("code", -1) != 0) throw new Exception(j.optString("msg", "API indisponible"));
                 JSONObject d = j.getJSONObject("data");
                 String id = d.optString("id", String.valueOf(System.currentTimeMillis()));

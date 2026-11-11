@@ -230,40 +230,37 @@ public class OverlayService extends AccessibilityService {
         java.util.LinkedHashSet<String> users = new java.util.LinkedHashSet<>();
         StringBuilder caption = new StringBuilder();
         StringBuilder dump = new StringBuilder();
-        java.util.regex.Pattern U = java.util.regex.Pattern.compile("^@?([A-Za-z0-9_.]{2,24})$");
-        java.util.regex.Pattern AT = java.util.regex.Pattern.compile("@([A-Za-z0-9_.]{2,24})");
+        long[] stats = {-1, -1, -1};
         for (AccessibilityNodeInfo root : roots()) {
             walk(root, 0, (n, depth) -> {
                 String t = n.getText() == null ? "" : n.getText().toString().trim();
                 String d = n.getContentDescription() == null ? "" : n.getContentDescription().toString().trim();
                 if (t.isEmpty() && d.isEmpty()) return;
                 Rect b = new Rect(); n.getBoundsInScreen(b);
+                String id = n.getViewIdResourceName() == null ? "" : n.getViewIdResourceName();
                 for (int k = 0; k < Math.min(depth, 30); k++) dump.append("  ");
                 dump.append(n.getClassName()).append(" | t=").append(t).append(" | d=").append(d)
-                        .append(" | id=").append(n.getViewIdResourceName()).append(" | ").append(b.toShortString()).append('\n');
-                boolean left = b.centerX() < W * 0.78f && b.centerY() > H * 0.45f;
-                boolean right = b.centerX() > W * 0.7f;
-                java.util.regex.Matcher am = AT.matcher(t + " " + d);
-                while (am.find()) if (left || right) users.add(am.group(1));
-                if (left) {
-                    java.util.regex.Matcher um = U.matcher(t);
-                    if (um.matches() && !t.matches("\\d+")) users.add(um.group(1));
-                    if (t.length() > caption.length() && t.contains(" ")) { caption.setLength(0); caption.append(t); }
-                }
+                        .append(" | id=").append(id).append(" | ").append(b.toShortString()).append('\n');
                 String dl = d.toLowerCase();
-                if (right && (dl.contains("profil") || dl.contains("profile"))) {
-                    for (String w : d.split("[\\s,]+")) {
-                        String wl = w.toLowerCase();
-                        if (U.matcher(w).matches() && !wl.equals("profile") && !wl.equals("profil")
-                                && !wl.equals("photo") && !wl.equals("de") && !wl.equals("du")) users.add(w.replace("@", ""));
-                    }
+                if (id.endsWith(":id/title") && !t.isEmpty() && !t.contains(" ")) users.add(t.replace("@", ""));
+                if (id.endsWith(":id/user_avatar") && dl.startsWith("profil")) {
+                    String u = d.replaceFirst("(?i)^profil[e]?\\s+", "").trim();
+                    if (!u.isEmpty() && !u.contains(" ")) users.add(u.replace("@", ""));
+                }
+                if (dl.contains("aime") && dl.contains("vid")) stats[0] = Downloader.parseCount(d);
+                else if (dl.contains("commentaire") || dl.contains("comment")) stats[1] = Downloader.parseCount(d);
+                else if (dl.startsWith("partager") || dl.startsWith("share")) stats[2] = Downloader.parseCount(d);
+                boolean left = b.centerX() < W * 0.78f && b.centerY() > H * 0.45f && b.bottom < H * 0.95f;
+                if (left && t.contains(" ") && !t.startsWith("Contient") && !id.endsWith(":id/ppp")
+                        && !t.equalsIgnoreCase("Collaboration commerciale") && t.length() > caption.length()) {
+                    caption.setLength(0); caption.append(t);
                 }
             });
         }
-        lastDump = "users=" + users + "\ncaption=" + caption + "\n\n" + dump;
+        lastDump = "users=" + users + "\ncaption=" + caption + "\nstats=" + Arrays.toString(stats) + "\n\n" + dump;
         getSharedPreferences("debug", MODE_PRIVATE).edit()
                 .putString("dump", lastDump.length() > 20000 ? lastDump.substring(0, 20000) : lastDump).apply();
-        Downloader.fromScreen(this, new ArrayList<>(users), caption.toString());
+        Downloader.fromScreen(this, new ArrayList<>(users), caption.toString(), stats);
     }
 
     static String lastDump = "";
