@@ -181,172 +181,30 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Rows -->
             <LinearLayout
-                android:id="@+id/step1"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_card"
-                android:gravity="center_vertical"
-                android:padding="18dp">
+                android:orientation="vertical"
+                android:padding="22dp">
 
                 <TextView
-                    android:id="@+id/badge1"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
-                    android:background="@drawable/bg_badge"
-                    android:fontFamily="sans-serif-condensed"
-                    android:gravity="center"
-                    android:text="1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Comment télécharger"
                     android:textColor="#FFFFFF"
-                    android:textSize="20sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Paramètres restreints"
-                        android:textColor="#FFFFFF"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Infos de l'app → ⋮ → Autoriser"
-                        android:textColor="#8C8C8C"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="›"
-                    android:textColor="#FFFFFF"
-                    android:textSize="28sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/step2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_card"
-                android:gravity="center_vertical"
-                android:padding="18dp">
-
-                <TextView
-                    android:id="@+id/badge2"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
-                    android:background="@drawable/bg_badge"
-                    android:fontFamily="sans-serif-condensed"
-                    android:gravity="center"
-                    android:text="2"
-                    android:textColor="#FFFFFF"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Accessibilité"
-                        android:textColor="#FFFFFF"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Applis téléchargées → TikSave"
-                        android:textColor="#8C8C8C"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="›"
-                    android:textColor="#FFFFFF"
-                    android:textSize="28sp" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginTop="22dp"
-                android:layout_marginBottom="10dp"
-                android:text="Bulle"
-                android:textColor="#8C8C8C"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:id="@+id/resetBubble"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_card"
-                android:gravity="center_vertical"
-                android:padding="18dp">
-
-                <FrameLayout
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
-                    android:background="@drawable/bg_badge">
-
-                    <ImageView
-                        android:layout_width="30dp"
-                        android:layout_height="30dp"
-                        android:layout_gravity="center"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/logo" />
-                </FrameLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Recaler la bulle"
-                        android:textColor="#FFFFFF"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Au-dessus de la photo de profil"
-                        android:textColor="#8C8C8C"
-                        android:textSize="14sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="›"
-                    android:textColor="#FFFFFF"
-                    android:textSize="28sp" />
+                    android:layout_marginTop="8dp"
+                    android:lineSpacingExtra="4dp"
+                    android:text="1. Sur TikTok, appuie sur Partager\n2. Choisis Plus / Autres applis\n3. Sélectionne TikSave\n\nOu copie le lien puis appuie sur Coller."
+                    android:textColor="#8C8C8C"
+                    android:textSize="15sp" />
             </LinearLayout>
 
             <LinearLayout

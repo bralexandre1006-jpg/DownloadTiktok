@@ -24,7 +24,7 @@ import java.util.Date;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
-    private TextView statusTitle, badge1, badge2, total, today;
+    private TextView statusTitle, total, today;
     private View statusDot, statusPulse;
 
     @Override
@@ -37,21 +37,12 @@ public class MainActivity extends Activity {
         statusTitle = findViewById(R.id.statusTitle);
         statusDot = findViewById(R.id.statusDot);
         statusPulse = findViewById(R.id.statusPulse);
-        badge1 = findViewById(R.id.badge1);
-        badge2 = findViewById(R.id.badge2);
         total = findViewById(R.id.total);
         today = findViewById(R.id.today);
 
-        click(R.id.step1, () -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:" + getPackageName()))));
-        click(R.id.step2, () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         click(R.id.openTikTok, this::openTikTok);
         click(R.id.pasteBtn, this::paste);
         click(R.id.pasteCard, this::paste);
-        click(R.id.resetBubble, () -> {
-            getSharedPreferences("pos", MODE_PRIVATE).edit().putBoolean("custom", false).apply();
-            Toast.makeText(this, "La bulle se recalera sur la photo de profil", Toast.LENGTH_SHORT).show();
-        });
 
         click(R.id.diag, this::showDiag);
 
@@ -181,17 +172,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        String en = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        boolean on = en != null && en.contains(getPackageName());
-        int c = on ? 0xFF2BD67B : 0xFFFF453A;
-        statusDot.setBackgroundTintList(ColorStateList.valueOf(c));
-        statusPulse.setBackgroundTintList(ColorStateList.valueOf(c));
-        statusTitle.setText(on ? "Bulle active sur TikTok" : "Service désactivé — termine la configuration");
-        for (TextView bdg : new TextView[]{badge1, badge2}) {
-            bdg.setBackgroundTintList(on ? ColorStateList.valueOf(0xFFF2F2F2) : null);
-            bdg.setTextColor(on ? 0xFF000000 : 0xFFFFFFFF);
-            bdg.setText(on ? "✓" : (bdg == badge1 ? "1" : "2"));
-        }
+        statusDot.setBackgroundTintList(ColorStateList.valueOf(0xFF2BD67B));
+        statusPulse.setBackgroundTintList(ColorStateList.valueOf(0xFF2BD67B));
+        statusTitle.setText("Prêt : Partager → TikSave");
 
         SharedPreferences s = getSharedPreferences("stats", MODE_PRIVATE);
         String day = new SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(new Date());
