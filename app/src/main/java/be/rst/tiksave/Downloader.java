@@ -86,6 +86,76 @@ public class Downloader {
         throw last;
     }
 
+    private static JSONObject http(Context c, String tag, String method, String url, String body) {
+        try {
+            HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+            con.setRequestMethod(method);
+            con.setRequestProperty("User-Agent", UA);
+            con.setRequestProperty("Accept", "application/json");
+            con.setConnectTimeout(15000);
+            con.setReadTimeout(20000);
+            if (body != null) {
+                con.setDoOutput(true);
+                con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                con.getOutputStream().write(body.getBytes("UTF-8"));
+            }
+            int code = con.getResponseCode();
+            java.io.InputStream in = code >= 400 ? con.getErrorStream() : con.getInputStream();
+            StringBuilder sb = new StringBuilder();
+            if (in != null) try (BufferedReader r = new BufferedReader(new InputStreamReader(in))) {
+                String l;
+                while ((l = r.readLine()) != null) sb.append(l);
+            }
+            String txt = sb.toString();
+            log(c, tag + " HTTP " + code + " " + txt.substring(0, Math.min(140, txt.length())));
+            if (code >= 400) return null;
+            JSONObject j = new JSONObject(txt);
+            return j.optInt("code", -1) == 0 ? j.optJSONObject("data") : null;
+        } catch (Exception e) {
+            log(c, tag + " err " + e);
+            return null;
+        }
+    }
+
+    private static JSONObject userPosts(Context c, String user, String cursor) throws Exception {
+        String q = "unique_id=" + URLEncoder.encode(user, "UTF-8") + "&count=35&cursor=" + cursor;
+        JSONObject d = http(c, "A", "POST", "https://tikwm.com/api/user/posts?" + q, "");
+        if (d == null) d = http(c, "B", "POST", "https://www.tikwm.com/api/user/posts", q);
+        if (d == null) d = http(c, "C", "GET", "https://www.tikwm.com/api/user/posts?" + q, null);
+        return d;
+    }
+
+    private static JSONObject search(Context c, String kw) throws Exception {
+        String q = "keywords=" + URLEncoder.encode(kw, "UTF-8") + "&count=30&cursor=0&HD=1";
+        JSONObject d = http(c, "S1", "POST", "https://www.tikwm.com/api/feed/search", q);
+        if (d == null) d = http(c, "S2", "GET", "https://www.tikwm.com/api/feed/search?" + q, null);
+        return d;
+    }
+
+    private static String[] pick(JSONArray vids, long[] st, java.util.Set<String> cap, String fallbackUser, double[] best) {
+        String[] r = null;
+        int known = 0;
+        for (long v : st) if (v >= 0) known++;
+        for (int i = 0; i < vids.length(); i++) {
+            JSONObject v = vids.optJSONObject(i);
+            if (v == null) continue;
+            int hits = 0;
+            if (near(st[0], v.optLong("digg_count", -1))) hits++;
+            if (near(st[1], v.optLong("comment_count", -1))) hits++;
+            if (near(st[2], v.optLong("share_count", -1))) hits++;
+            double cs = score(cap, v.optString("title", ""));
+            boolean ok = hits >= 2 || (hits >= 1 && cs >= 0.5) || cs >= 0.75 || (known == 1 && hits == 1);
+            double sc = hits + cs;
+            if (ok && sc > best[0]) {
+                best[0] = sc;
+                JSONObject a = v.optJSONObject("author");
+                String u = a != null ? a.optString("unique_id", fallbackUser) : fallbackUser;
+                r = new String[]{u, v.optString("video_id", v.optString("id"))};
+            }
+        }
+        return r;
+    }
+
     public static void fromScreen(Context ctx, java.util.List<String> users, String caption, long[] st) {
         Context c = ctx.getApplicationContext();
         Handler h = new Handler(Looper.getMainLooper());
@@ -93,53 +163,41 @@ public class Downloader {
         if (users.isEmpty()) { toast(h, c, "Pseudo introuvable à l'écran"); result(false); return; }
         new Thread(() -> {
             java.util.Set<String> cap = words(caption);
-            String bestUser = null, bestId = null;
-            double best = 0;
-            int known = 0;
-            for (long v : st) if (v >= 0) known++;
+            double[] best = {0};
+            String[] found = null;
             try {
-                outer:
-                for (int u = 0; u < Math.min(users.size(), 2); u++) {
-                    String user = users.get(u);
-                    String cursor = "0";
-                    for (int page = 0; page < 4; page++) {
-                        JSONObject j = post("user/posts", "unique_id=" + URLEncoder.encode(user, "UTF-8")
-                                + "&count=35&cursor=" + cursor);
-                        log(c, "posts " + user + " p" + page + " code=" + j.optInt("code", -1) + " msg=" + j.optString("msg"));
-                        if (j.optInt("code", -1) != 0) { Thread.sleep(1100); break; }
-                        JSONObject d = j.getJSONObject("data");
-                        JSONArray vids = d.optJSONArray("videos");
-                        if (vids == null || vids.length() == 0) break;
-                        for (int i = 0; i < vids.length(); i++) {
-                            JSONObject v = vids.getJSONObject(i);
-                            int hits = 0;
-                            if (near(st[0], v.optLong("digg_count", -1))) hits++;
-                            if (near(st[1], v.optLong("comment_count", -1))) hits++;
-                            if (near(st[2], v.optLong("share_count", -1))) hits++;
-                            double cs = score(cap, v.optString("title", ""));
-                            double sc = hits + cs;
-                            boolean ok = hits >= 2 || (hits >= 1 && cs >= 0.5) || cs >= 0.75 || (known == 1 && hits == 1);
-                            if (ok && sc > best) { best = sc; bestUser = user; bestId = v.optString("video_id"); }
-                        }
-                        if (best >= 2.5 || (known > 0 && best >= known)) break outer;
-                        if (!d.optBoolean("hasMore", false)) break;
-                        cursor = d.optString("cursor", "0");
-                        Thread.sleep(1100);
+                String user = users.get(0);
+                String cursor = "0";
+                for (int page = 0; page < 4; page++) {
+                    JSONObject d = userPosts(c, user, cursor);
+                    if (d == null) break;
+                    JSONArray vids = d.optJSONArray("videos");
+                    if (vids == null || vids.length() == 0) break;
+                    String[] r = pick(vids, st, cap, user, best);
+                    if (r != null) found = r;
+                    if (best[0] >= 2.5) break;
+                    if (!d.optBoolean("hasMore", false)) break;
+                    cursor = d.optString("cursor", "0");
+                    Thread.sleep(1100);
+                }
+                if (found == null) {
+                    Thread.sleep(1100);
+                    JSONObject d = search(c, (user + " " + caption).trim());
+                    if (d != null && d.optJSONArray("videos") != null) {
+                        String[] r = pick(d.optJSONArray("videos"), st, cap, user, best);
+                        if (r != null) found = r;
                     }
                 }
             } catch (Exception e) {
-                log(c, "erreur posts: " + e);
-                toast(h, c, "Échec : " + e.getMessage());
-                result(false);
-                return;
+                log(c, "erreur: " + e);
             }
-            log(c, "best=" + best + " user=" + bestUser + " id=" + bestId);
-            if (bestId == null) {
+            log(c, "best=" + best[0] + " found=" + (found == null ? "null" : found[0] + "/" + found[1]));
+            if (found == null) {
                 toast(h, c, "Vidéo introuvable");
                 result(false);
                 return;
             }
-            start(c, "https://www.tiktok.com/@" + bestUser + "/video/" + bestId);
+            start(c, "https://www.tiktok.com/@" + found[0] + "/video/" + found[1]);
         }).start();
     }
 
