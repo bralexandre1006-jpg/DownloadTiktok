@@ -57,6 +57,7 @@ public class OverlayService extends AccessibilityService {
         size = dp(46);
         Downloader.listener = ok -> {
             if (bubble != null) bubble.setState(ok ? BubbleView.OK : BubbleView.ERR);
+            if (!ok && busy && android.os.Build.VERSION.SDK_INT >= 29) writeDump(this, "ECHEC");
             busy = false;
         };
     }
@@ -215,85 +216,79 @@ public class OverlayService extends AccessibilityService {
 
     // ---------- Capture ----------
 
-    private android.widget.ImageView cover;
-
     private void capture() {
         if (busy || bubble == null) return;
         busy = true;
         bubble.setState(BubbleView.BUSY);
         h.postDelayed(() -> {
-            hideCover();
             if (busy) { busy = false; if (bubble != null) bubble.setState(BubbleView.IDLE); }
-        }, 15000);
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            takeScreenshot(android.view.Display.DEFAULT_DISPLAY, getMainExecutor(), new TakeScreenshotCallback() {
-                @Override
-                public void onSuccess(ScreenshotResult r) {
-                    android.graphics.Bitmap bmp = android.graphics.Bitmap.wrapHardwareBuffer(r.getHardwareBuffer(), r.getColorSpace());
-                    showCover(bmp);
-                    runFlow();
+        }, 40000);
+
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int W = dm.widthPixels, H = dm.heightPixels;
+        java.util.LinkedHashSet<String> users = new java.util.LinkedHashSet<>();
+        StringBuilder caption = new StringBuilder();
+        StringBuilder dump = new StringBuilder();
+        java.util.regex.Pattern U = java.util.regex.Pattern.compile("^@?([A-Za-z0-9_.]{2,24})$");
+        java.util.regex.Pattern AT = java.util.regex.Pattern.compile("@([A-Za-z0-9_.]{2,24})");
+        for (AccessibilityNodeInfo root : roots()) {
+            walk(root, 0, (n, depth) -> {
+                String t = n.getText() == null ? "" : n.getText().toString().trim();
+                String d = n.getContentDescription() == null ? "" : n.getContentDescription().toString().trim();
+                if (t.isEmpty() && d.isEmpty()) return;
+                Rect b = new Rect(); n.getBoundsInScreen(b);
+                for (int k = 0; k < Math.min(depth, 30); k++) dump.append("  ");
+                dump.append(n.getClassName()).append(" | t=").append(t).append(" | d=").append(d)
+                        .append(" | id=").append(n.getViewIdResourceName()).append(" | ").append(b.toShortString()).append('\n');
+                boolean left = b.centerX() < W * 0.78f && b.centerY() > H * 0.45f;
+                boolean right = b.centerX() > W * 0.7f;
+                java.util.regex.Matcher am = AT.matcher(t + " " + d);
+                while (am.find()) if (left || right) users.add(am.group(1));
+                if (left) {
+                    java.util.regex.Matcher um = U.matcher(t);
+                    if (um.matches() && !t.matches("\\d+")) users.add(um.group(1));
+                    if (t.length() > caption.length() && t.contains(" ")) { caption.setLength(0); caption.append(t); }
                 }
-                @Override
-                public void onFailure(int code) { runFlow(); }
+                String dl = d.toLowerCase();
+                if (right && (dl.contains("profil") || dl.contains("profile"))) {
+                    for (String w : d.split("[\\s,]+")) {
+                        String wl = w.toLowerCase();
+                        if (U.matcher(w).matches() && !wl.equals("profile") && !wl.equals("profil")
+                                && !wl.equals("photo") && !wl.equals("de") && !wl.equals("du")) users.add(w.replace("@", ""));
+                    }
+                }
             });
-        } else runFlow();
-    }
-
-    private void runFlow() {
-        waitFor(this::findShare, 8, share -> {
-            tap(share);
-            waitFor(this::findCopy, 12, copy -> {
-                tap(copy);
-                h.postDelayed(() -> {
-                    Intent i = new Intent(this, ClipActivity.class);
-                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                    startActivity(i);
-                    h.postDelayed(this::hideCover, 500);
-                }, 600);
-            }, () -> { pressBack(); fail("« Copier le lien » introuvable"); });
-        }, () -> fail("Bouton Partager introuvable"));
-    }
-
-    private void pressBack() {
-        performGlobalAction(GLOBAL_ACTION_BACK);
-    }
-
-    @android.annotation.TargetApi(30)
-    private void showCover(android.graphics.Bitmap bmp) {
-        if (bmp == null || cover != null) return;
-        cover = new android.widget.ImageView(this);
-        cover.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
-        cover.setImageBitmap(bmp);
-        WindowManager.LayoutParams c = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.OPAQUE);
-        c.gravity = Gravity.TOP | Gravity.START;
-        android.graphics.Rect b = wm.getMaximumWindowMetrics().getBounds();
-        c.width = b.width();
-        c.height = b.height();
-        if (android.os.Build.VERSION.SDK_INT >= 30)
-            c.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-        wm.addView(cover, c);
-        if (bubble != null) {
-            try { wm.removeViewImmediate(bubble); wm.addView(bubble, lp); } catch (Exception ignored) {}
         }
+        lastDump = "users=" + users + "\ncaption=" + caption + "\n\n" + dump;
+        Downloader.fromScreen(this, new ArrayList<>(users), caption.toString());
     }
 
-    private void hideCover() {
-        if (cover == null) return;
-        android.widget.ImageView v = cover;
-        cover = null;
-        v.animate().alpha(0f).setDuration(150)
-                .withEndAction(() -> { try { wm.removeView(v); } catch (Exception ignored) {} }).start();
+    static String lastDump = "";
+
+    interface Visit { void on(AccessibilityNodeInfo n, int depth); }
+
+    private void walk(AccessibilityNodeInfo n, int depth, Visit v) {
+        if (n == null || depth > 80) return;
+        if (n.isVisibleToUser()) v.on(n, depth);
+        for (int i = 0; i < n.getChildCount(); i++) walk(n.getChild(i), depth + 1, v);
+    }
+
+    @android.annotation.TargetApi(29)
+    static void writeDump(android.content.Context c, String reason) {
+        try {
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, "TikSave_debug.txt");
+            v.put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain");
+            v.put(android.provider.MediaStore.Downloads.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS);
+            android.net.Uri u = c.getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+            if (u == null) return;
+            try (java.io.OutputStream o = c.getContentResolver().openOutputStream(u)) {
+                o.write((reason + "\n" + lastDump).getBytes("UTF-8"));
+            }
+        } catch (Exception ignored) {}
     }
 
     private void fail(String m) {
-        hideCover();
         busy = false;
         if (bubble != null) bubble.setState(BubbleView.ERR);
         Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
@@ -318,7 +313,7 @@ public class OverlayService extends AccessibilityService {
     }
 
     private static String low(CharSequence c) {
-        return c == null ? "" : c.toString().toLowerCase();
+        return c == null ? "" : c.toString().toLowerCase().replaceAll("\\s+", " ");
     }
 
     private AccessibilityNodeInfo findFirst(Match m) {
