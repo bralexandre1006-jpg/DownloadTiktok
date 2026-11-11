@@ -53,6 +53,8 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "La bulle se recalera sur la photo de profil", Toast.LENGTH_SHORT).show();
         });
 
+        click(R.id.diag, this::showDiag);
+
         try {
             ((TextView) findViewById(R.id.version)).setText("TikSave v" +
                     getPackageManager().getPackageInfo(getPackageName(), 0).versionName + " · R.S.T SRL");
@@ -121,6 +123,31 @@ public class MainActivity extends Activity {
             return false;
         });
         v.setOnClickListener(x -> r.run());
+    }
+
+    private void showDiag() {
+        SharedPreferences p = getSharedPreferences("debug", MODE_PRIVATE);
+        String txt = "LOG\n" + p.getString("log", "(vide)") + "\n\nECRAN\n" + p.getString("dump", "(vide)");
+        TextView tv = new TextView(this);
+        tv.setText(txt);
+        tv.setTextColor(0xFFDDDDDD);
+        tv.setTextSize(11);
+        tv.setTextIsSelectable(true);
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        tv.setPadding(pad, pad, pad, pad);
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(tv);
+        new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Diagnostic")
+                .setView(sv)
+                .setPositiveButton("Copier", (d, w) -> {
+                    ((android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE))
+                            .setPrimaryClip(android.content.ClipData.newPlainText("TikSave", txt));
+                    Toast.makeText(this, "Copié", Toast.LENGTH_SHORT).show();
+                })
+                .setNeutralButton("Effacer", (d, w) -> p.edit().clear().apply())
+                .setNegativeButton("Fermer", null)
+                .show();
     }
 
     private void paste() {

@@ -223,6 +223,7 @@ public class OverlayService extends AccessibilityService {
         h.postDelayed(() -> {
             if (busy) { busy = false; if (bubble != null) bubble.setState(BubbleView.IDLE); }
         }, 40000);
+        Downloader.log(this, "tap bulle, fenêtres TikTok=" + roots().size());
 
         DisplayMetrics dm = getResources().getDisplayMetrics();
         int W = dm.widthPixels, H = dm.heightPixels;
@@ -260,6 +261,8 @@ public class OverlayService extends AccessibilityService {
             });
         }
         lastDump = "users=" + users + "\ncaption=" + caption + "\n\n" + dump;
+        getSharedPreferences("debug", MODE_PRIVATE).edit()
+                .putString("dump", lastDump.length() > 20000 ? lastDump.substring(0, 20000) : lastDump).apply();
         Downloader.fromScreen(this, new ArrayList<>(users), caption.toString());
     }
 

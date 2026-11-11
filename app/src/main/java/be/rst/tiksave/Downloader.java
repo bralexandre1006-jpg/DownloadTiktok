@@ -61,6 +61,7 @@ public class Downloader {
     public static void fromScreen(Context ctx, java.util.List<String> users, String caption) {
         Context c = ctx.getApplicationContext();
         Handler h = new Handler(Looper.getMainLooper());
+        log(c, "users=" + users + " | caption=" + caption);
         if (users.isEmpty()) { toast(h, c, "Pseudo introuvable à l'écran"); result(false); return; }
         new Thread(() -> {
             java.util.Set<String> cap = words(caption);
@@ -75,6 +76,7 @@ public class Downloader {
                         JSONObject j = get("https://www.tikwm.com/api/user/posts?count=35&unique_id="
                                 + URLEncoder.encode(user, "UTF-8") + "&cursor=" + cursor);
                         Thread.sleep(1100);
+                        log(c, "posts " + user + " p" + page + " code=" + j.optInt("code", -1) + " msg=" + j.optString("msg"));
                         if (j.optInt("code", -1) != 0) break;
                         JSONObject d = j.getJSONObject("data");
                         JSONArray vids = d.optJSONArray("videos");
@@ -93,10 +95,12 @@ public class Downloader {
                     }
                 }
             } catch (Exception e) {
+                log(c, "erreur posts: " + e);
                 toast(h, c, "Échec : " + e.getMessage());
                 result(false);
                 return;
             }
+            log(c, "best=" + best + " user=" + bestUser + " id=" + bestId);
             if (bestId == null || (!cap.isEmpty() && best < 0.4)) {
                 toast(h, c, "Vidéo introuvable (debug dans Téléchargements)");
                 result(false);
@@ -104,6 +108,15 @@ public class Downloader {
             }
             start(c, "https://www.tiktok.com/@" + bestUser + "/video/" + bestId);
         }).start();
+    }
+
+    public static void log(Context c, String m) {
+        android.content.SharedPreferences p = c.getSharedPreferences("debug", Context.MODE_PRIVATE);
+        String t = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.ROOT).format(new java.util.Date());
+        String old = p.getString("log", "");
+        String n = t + " " + m + "\n" + old;
+        if (n.length() > 5000) n = n.substring(0, 5000);
+        p.edit().putString("log", n).apply();
     }
 
     public static String extractUrl(String t) {
@@ -151,6 +164,7 @@ public class Downloader {
                 s.edit().putInt("total", s.getInt("total", 0) + 1).putString("day", day).putInt("today", td + 1).apply();
                 result(true);
             } catch (Exception e) {
+                log(c, "erreur download: " + e);
                 toast(h, c, "Échec : " + e.getMessage());
                 result(false);
             }
