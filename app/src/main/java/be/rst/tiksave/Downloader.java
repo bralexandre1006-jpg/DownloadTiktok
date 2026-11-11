@@ -49,6 +49,43 @@ public class Downloader {
         } catch (Exception e) { return -1; }
     }
 
+    private static JSONObject tikwm(String u) throws Exception {
+        HttpURLConnection con = (HttpURLConnection) new URL(
+                "https://www.tikwm.com/api/?hd=1&url=" + URLEncoder.encode(u, "UTF-8")).openConnection();
+        con.setRequestProperty("User-Agent", UA);
+        con.setConnectTimeout(15000);
+        con.setReadTimeout(20000);
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
+            String l;
+            while ((l = r.readLine()) != null) sb.append(l);
+        }
+        return new JSONObject(sb.toString());
+    }
+
+    private static String canonical(String url) {
+        String cur = url;
+        try {
+            for (int hop = 0; hop < 6; hop++) {
+                if (cur.matches(".*/(video|photo)/\\d+.*")) break;
+                HttpURLConnection con = (HttpURLConnection) new URL(cur).openConnection();
+                con.setInstanceFollowRedirects(false);
+                con.setRequestProperty("User-Agent", UA);
+                con.setConnectTimeout(10000);
+                con.setReadTimeout(10000);
+                String loc = con.getHeaderField("Location");
+                con.disconnect();
+                if (loc == null) break;
+                cur = new URL(new URL(cur), loc).toString();
+            }
+        } catch (Exception ignored) {}
+        Matcher m = Pattern.compile("@([^/?#]+)/(video|photo)/(\\d+)").matcher(cur);
+        if (m.find()) return "https://www.tiktok.com/@" + m.group(1) + "/video/" + m.group(3);
+        m = Pattern.compile("/(video|photo)/(\\d+)").matcher(cur);
+        if (m.find()) return "https://www.tiktok.com/@i/video/" + m.group(2);
+        return cur;
+    }
+
     public static String extractUrl(String t) {
         if (t == null) return null;
         Matcher m = TT.matcher(t);
@@ -61,17 +98,12 @@ public class Downloader {
         toast(h, c, "Récupération de la vidéo…");
         new Thread(() -> {
             try {
-                HttpURLConnection con = (HttpURLConnection) new URL(
-                        "https://www.tikwm.com/api/?hd=1&url=" + URLEncoder.encode(url, "UTF-8")).openConnection();
-                con.setRequestProperty("User-Agent", UA);
-                con.setConnectTimeout(15000);
-                con.setReadTimeout(20000);
-                StringBuilder sb = new StringBuilder();
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
-                    String l;
-                    while ((l = r.readLine()) != null) sb.append(l);
-                }
-                JSONObject j = new JSONObject(sb.toString());
+                log(c, "lien copié: " + url);
+                String canon = canonical(url);
+                log(c, "lien complet: " + canon);
+                JSONObject j = tikwm(canon);
+                if (j.optInt("code", -1) != 0 && !canon.equals(url)) j = tikwm(url);
+                log(c, "tikwm code=" + j.optInt("code", -1) + " " + j.optString("msg"));
                 if (j.optInt("code", -1) != 0) throw new Exception(j.optString("msg", "API indisponible"));
                 JSONObject d = j.getJSONObject("data");
                 String id = d.optString("id", String.valueOf(System.currentTimeMillis()));
