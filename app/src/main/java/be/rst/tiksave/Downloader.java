@@ -216,28 +216,124 @@ public class Downloader {
         return m.find() ? m.group() : null;
     }
 
+    private static final String WEB_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+    private static java.net.CookieManager cookies;
+
+    private static String fetch(String url, String[] finalUrl) throws Exception {
+        if (cookies == null) {
+            cookies = new java.net.CookieManager(null, java.net.CookiePolicy.ACCEPT_ALL);
+            java.net.CookieHandler.setDefault(cookies);
+        }
+        String cur = url;
+        for (int hop = 0; hop < 6; hop++) {
+            HttpURLConnection con = (HttpURLConnection) new URL(cur).openConnection();
+            con.setInstanceFollowRedirects(false);
+            con.setRequestProperty("User-Agent", WEB_UA);
+            con.setRequestProperty("Accept-Language", "fr-FR,fr;q=0.9,en;q=0.8");
+            con.setRequestProperty("Accept", "text/html,application/xhtml+xml");
+            con.setConnectTimeout(15000);
+            con.setReadTimeout(20000);
+            int code = con.getResponseCode();
+            if (code >= 300 && code < 400 && con.getHeaderField("Location") != null) {
+                cur = new URL(new URL(cur), con.getHeaderField("Location")).toString();
+                continue;
+            }
+            if (finalUrl != null) finalUrl[0] = cur;
+            java.io.InputStream in = code >= 400 ? con.getErrorStream() : con.getInputStream();
+            StringBuilder sb = new StringBuilder();
+            if (in != null) try (BufferedReader r = new BufferedReader(new InputStreamReader(in, "UTF-8"))) {
+                String l;
+                while ((l = r.readLine()) != null) sb.append(l).append('\n');
+            }
+            if (code >= 400) throw new Exception("HTTP " + code);
+            return sb.toString();
+        }
+        throw new Exception("trop de redirections");
+    }
+
+    private static String cookieHeader() {
+        StringBuilder sb = new StringBuilder();
+        if (cookies != null) for (java.net.HttpCookie ck : cookies.getCookieStore().getCookies()) {
+            if (ck.getDomain() != null && ck.getDomain().contains("tiktok")) {
+                if (sb.length() > 0) sb.append("; ");
+                sb.append(ck.getName()).append('=').append(ck.getValue());
+            }
+        }
+        return sb.toString();
+    }
+
+    private static JSONObject findItem(String html, String id) throws Exception {
+        Matcher m = Pattern.compile("<script id=\"__UNIVERSAL_DATA_FOR_REHYDRATION__\"[^>]*>(.*?)</script>", Pattern.DOTALL).matcher(html);
+        if (m.find()) {
+            JSONObject root = new JSONObject(m.group(1));
+            JSONObject scope = root.optJSONObject("__DEFAULT_SCOPE__");
+            if (scope != null) {
+                JSONObject det = scope.optJSONObject("webapp.video-detail");
+                if (det == null) det = scope.optJSONObject("webapp.reflow.video.detail");
+                if (det != null && det.optJSONObject("itemInfo") != null)
+                    return det.getJSONObject("itemInfo").optJSONObject("itemStruct");
+            }
+        }
+        m = Pattern.compile("<script id=\"SIGI_STATE\"[^>]*>(.*?)</script>", Pattern.DOTALL).matcher(html);
+        if (m.find()) {
+            JSONObject im = new JSONObject(m.group(1)).optJSONObject("ItemModule");
+            if (im != null) return im.optJSONObject(id);
+        }
+        return null;
+    }
+
     public static void start(Context ctx, String url) {
         Context c = ctx.getApplicationContext();
         Handler h = new Handler(Looper.getMainLooper());
-        toast(h, c, "Récupération de la vidéo…");
+        toast(h, c, "Téléchargement…");
         new Thread(() -> {
             try {
-                JSONObject j = post("", "hd=1&url=" + URLEncoder.encode(url, "UTF-8"));
-                if (j.optInt("code", -1) != 0) throw new Exception(j.optString("msg", "API indisponible"));
-                JSONObject d = j.getJSONObject("data");
-                String id = d.optString("id", String.valueOf(System.currentTimeMillis()));
-                DownloadManager dm = (DownloadManager) c.getSystemService(Context.DOWNLOAD_SERVICE);
-                JSONArray imgs = d.optJSONArray("images");
+                log(c, "lien: " + url);
+                String[] fin = new String[1];
+                String html = fetch(url, fin);
+                Matcher idm = Pattern.compile("/(?:video|photo)/(\\d+)").matcher(fin[0]);
+                String id = idm.find() ? idm.group(1) : String.valueOf(System.currentTimeMillis());
+                log(c, "page: " + fin[0] + " (" + html.length() + " car.)");
+                if (!fin[0].contains("/video/") && !fin[0].contains("/photo/"))
+                    throw new Exception("lien non reconnu");
+                JSONObject item = findItem(html, id);
+                if (item == null) {
+                    html = fetch("https://www.tiktok.com/@i/video/" + id, null);
+                    item = findItem(html, id);
+                }
+                if (item == null) throw new Exception("données vidéo absentes de la page");
+                String ck = cookieHeader();
+                JSONObject ip = item.optJSONObject("imagePost");
+                JSONArray imgs = ip != null ? ip.optJSONArray("images") : null;
                 if (imgs != null && imgs.length() > 0) {
-                    for (int i = 0; i < imgs.length(); i++)
-                        enqueue(dm, abs(imgs.getString(i)), Environment.DIRECTORY_PICTURES, "TikTok/" + id + "_" + (i + 1) + ".jpg");
-                    toast(h, c, imgs.length() + " photos en téléchargement");
+                    for (int i = 0; i < imgs.length(); i++) {
+                        JSONObject im = imgs.getJSONObject(i).optJSONObject("imageURL");
+                        JSONArray ul = im != null ? im.optJSONArray("urlList") : null;
+                        if (ul != null && ul.length() > 0)
+                            enqueue(c, ul.getString(0), ck, Environment.DIRECTORY_PICTURES, "TikTok/" + id + "_" + (i + 1) + ".jpg");
+                    }
+                    toast(h, c, imgs.length() + " photos enregistrées ✔");
                 } else {
-                    String v = d.optString("hdplay", "");
-                    if (v.isEmpty()) v = d.optString("play", "");
-                    if (v.isEmpty()) throw new Exception("lien vidéo introuvable");
-                    enqueue(dm, abs(v), Environment.DIRECTORY_MOVIES, "TikTok/" + id + ".mp4");
-                    toast(h, c, "Téléchargement lancé ✔");
+                    JSONObject v = item.getJSONObject("video");
+                    java.util.List<String> cands = new java.util.ArrayList<>();
+                    JSONArray br = v.optJSONArray("bitrateInfo");
+                    if (br != null && br.length() > 0) {
+                        JSONObject pa = br.getJSONObject(0).optJSONObject("PlayAddr");
+                        JSONArray ul = pa != null ? pa.optJSONArray("UrlList") : null;
+                        if (ul != null) for (int i = 0; i < ul.length(); i++) cands.add(ul.getString(i));
+                    }
+                    if (!v.optString("playAddr").isEmpty()) cands.add(v.optString("playAddr"));
+                    if (!v.optString("downloadAddr").isEmpty()) cands.add(v.optString("downloadAddr"));
+                    if (cands.isEmpty()) throw new Exception("adresse vidéo absente");
+                    log(c, cands.size() + " sources, cookies=" + (ck.isEmpty() ? "non" : "oui"));
+                    Exception last = null;
+                    boolean done = false;
+                    for (String src : cands) {
+                        try { enqueue(c, src, ck, Environment.DIRECTORY_MOVIES, "TikTok/" + id + ".mp4"); done = true; break; }
+                        catch (Exception ex) { last = ex; log(c, "source KO: " + ex.getMessage()); }
+                    }
+                    if (!done) throw last;
+                    toast(h, c, "Vidéo enregistrée ✔");
                 }
                 android.content.SharedPreferences s = c.getSharedPreferences("stats", Context.MODE_PRIVATE);
                 String day = new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT).format(new java.util.Date());
@@ -256,13 +352,38 @@ public class Downloader {
         return u.startsWith("/") ? "https://www.tikwm.com" + u : u;
     }
 
-    private static void enqueue(DownloadManager dm, String url, String dir, String name) {
-        DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
-        r.addRequestHeader("User-Agent", UA);
-        r.setTitle(name.substring(name.indexOf('/') + 1));
-        r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        r.setDestinationInExternalPublicDir(dir, name);
-        dm.enqueue(r);
+    @android.annotation.TargetApi(29)
+    private static void enqueue(Context c, String url, String cookie, String dir, String name) throws Exception {
+        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+        con.setRequestProperty("User-Agent", WEB_UA);
+        con.setRequestProperty("Referer", "https://www.tiktok.com/");
+        if (cookie != null && !cookie.isEmpty()) con.setRequestProperty("Cookie", cookie);
+        con.setConnectTimeout(15000);
+        con.setReadTimeout(30000);
+        int code = con.getResponseCode();
+        if (code >= 400) throw new Exception("fichier HTTP " + code);
+        boolean video = name.endsWith(".mp4");
+        android.content.ContentValues v = new android.content.ContentValues();
+        v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name.substring(name.indexOf('/') + 1));
+        v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, video ? "video/mp4" : "image/jpeg");
+        v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, dir + "/TikTok");
+        v.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1);
+        android.net.Uri col = video ? android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                : android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        android.net.Uri u = c.getContentResolver().insert(col, v);
+        if (u == null) throw new Exception("stockage indisponible");
+        long total = 0;
+        try (java.io.InputStream in = con.getInputStream();
+             java.io.OutputStream out = c.getContentResolver().openOutputStream(u)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) > 0) { out.write(buf, 0, n); total += n; }
+        }
+        v.clear();
+        v.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0);
+        c.getContentResolver().update(u, v, null, null);
+        log(c, "enregistré " + name + " (" + total / 1024 + " Ko)");
+        if (total < 10_000) throw new Exception("fichier vide (" + total + " o)");
     }
 
     private static void toast(Handler h, Context c, String m) {

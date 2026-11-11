@@ -260,7 +260,40 @@ public class OverlayService extends AccessibilityService {
         lastDump = "users=" + users + "\ncaption=" + caption + "\nstats=" + Arrays.toString(stats) + "\n\n" + dump;
         getSharedPreferences("debug", MODE_PRIVATE).edit()
                 .putString("dump", lastDump.length() > 20000 ? lastDump.substring(0, 20000) : lastDump).apply();
-        Downloader.fromScreen(this, new ArrayList<>(users), caption.toString(), stats);
+        runShare();
+    }
+
+    private void runShare() {
+        waitFor(this::findShare, 10, share -> {
+            Downloader.log(this, "partager trouvé");
+            tap(share);
+            waitFor(this::findCopy, 25, copy -> {
+                Downloader.log(this, "copier le lien trouvé");
+                tap(copy);
+                h.postDelayed(() -> {
+                    if (findCopy() != null) performGlobalAction(GLOBAL_ACTION_BACK);
+                    Intent i = new Intent(this, ClipActivity.class);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                    startActivity(i);
+                }, 350);
+            }, () -> {
+                saveSheetDump();
+                performGlobalAction(GLOBAL_ACTION_BACK);
+                fail("« Copier le lien » introuvable");
+            });
+        }, () -> fail("Bouton Partager introuvable"));
+    }
+
+    private void saveSheetDump() {
+        StringBuilder sb = new StringBuilder("MENU PARTAGE\n");
+        for (AccessibilityNodeInfo root : roots())
+            walk(root, 0, (n, d) -> {
+                if (n.getText() == null && n.getContentDescription() == null) return;
+                sb.append(n.getText()).append(" | ").append(n.getContentDescription()).append(" | ")
+                        .append(n.getViewIdResourceName()).append('\n');
+            });
+        getSharedPreferences("debug", MODE_PRIVATE).edit().putString("dump", sb.toString()).apply();
+        Downloader.log(this, "copier le lien introuvable (voir ECRAN)");
     }
 
     static String lastDump = "";
@@ -298,7 +331,7 @@ public class OverlayService extends AccessibilityService {
         AccessibilityNodeInfo n = f.find();
         if (n != null) ok.on(n);
         else if (tries <= 0) ko.run();
-        else h.postDelayed(() -> waitFor(f, tries - 1, ok, ko), 250);
+        else h.postDelayed(() -> waitFor(f, tries - 1, ok, ko), 120);
     }
 
     private List<AccessibilityNodeInfo> roots() {
@@ -339,7 +372,7 @@ public class OverlayService extends AccessibilityService {
         int half = getResources().getDisplayMetrics().widthPixels / 2;
         return findFirst(node -> {
             String d = low(node.getContentDescription());
-            if (!(d.contains("partag") || d.contains("share"))) return false;
+            if (!(d.startsWith("partager") || d.startsWith("share"))) return false;
             Rect b = new Rect(); node.getBoundsInScreen(b);
             return b.centerX() > half && b.width() > 0;
         });
@@ -348,7 +381,8 @@ public class OverlayService extends AccessibilityService {
     private AccessibilityNodeInfo findCopy() {
         return findFirst(node -> {
             String t = low(node.getText()) + "|" + low(node.getContentDescription());
-            if (!(t.contains("copier le lien") || t.contains("copy link") || t.contains("copier lien"))) return false;
+            if (!(t.contains("copier le lien") || t.contains("copy link") || t.contains("copier lien")
+                    || (t.contains("copi") && t.contains("lien")))) return false;
             Rect b = new Rect(); node.getBoundsInScreen(b);
             return b.width() > 0;
         });
