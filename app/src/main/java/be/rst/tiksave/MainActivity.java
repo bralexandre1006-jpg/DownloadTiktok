@@ -6,6 +6,7 @@ import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,9 +19,12 @@ import android.view.animation.OvershootInterpolator;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 public class MainActivity extends Activity {
-    private static final int GREEN = 0xFF2BD67B, RED = 0xFFFE2C55;
-    private TextView statusTitle, statusSub, badge1, badge2;
+    private TextView statusTitle, badge1, badge2, total, today;
     private View statusDot, statusPulse;
 
     @Override
@@ -31,16 +35,19 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         statusTitle = findViewById(R.id.statusTitle);
-        statusSub = findViewById(R.id.statusSub);
         statusDot = findViewById(R.id.statusDot);
         statusPulse = findViewById(R.id.statusPulse);
         badge1 = findViewById(R.id.badge1);
         badge2 = findViewById(R.id.badge2);
+        total = findViewById(R.id.total);
+        today = findViewById(R.id.today);
 
         click(R.id.step1, () -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.parse("package:" + getPackageName()))));
         click(R.id.step2, () -> startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
         click(R.id.openTikTok, this::openTikTok);
+        click(R.id.pasteBtn, this::paste);
+        click(R.id.pasteCard, this::paste);
         click(R.id.resetBubble, () -> {
             getSharedPreferences("pos", MODE_PRIVATE).edit().putBoolean("custom", false).apply();
             Toast.makeText(this, "La bulle se recalera sur la photo de profil", Toast.LENGTH_SHORT).show();
@@ -65,7 +72,8 @@ public class MainActivity extends Activity {
 
     private void playSplash() {
         View splash = findViewById(R.id.splash), logo = findViewById(R.id.splashLogo),
-                glow = findViewById(R.id.splashGlow), title = findViewById(R.id.splashTitle);
+                glow = findViewById(R.id.splashGlow), title = findViewById(R.id.splashTitle),
+                bar = findViewById(R.id.bottomBar);
         ViewGroup content = findViewById(R.id.content);
         float d = getResources().getDisplayMetrics().density;
 
@@ -74,29 +82,31 @@ public class MainActivity extends Activity {
             c.setAlpha(0f);
             c.setTranslationY(50 * d);
         }
+        bar.setTranslationY(140 * d);
 
-        logo.setScaleX(0.2f); logo.setScaleY(0.2f); logo.setAlpha(0f); logo.setRotation(-180f);
+        logo.setScaleX(0.2f); logo.setScaleY(0.2f); logo.setAlpha(0f); logo.setRotation(-135f);
         logo.animate().scaleX(1f).scaleY(1f).alpha(1f).rotation(0f)
-                .setInterpolator(new OvershootInterpolator(1.6f)).setDuration(750).start();
+                .setInterpolator(new OvershootInterpolator(1.4f)).setDuration(750).start();
 
-        glow.setScaleX(0.4f); glow.setScaleY(0.4f); glow.setAlpha(0f);
-        glow.animate().scaleX(1.3f).scaleY(1.3f).alpha(1f).setStartDelay(200).setDuration(700)
-                .withEndAction(() -> glow.animate().scaleX(1f).scaleY(1f).alpha(0.6f).setDuration(400).start())
-                .start();
+        glow.setScaleX(0.3f); glow.setScaleY(0.3f); glow.setAlpha(0f);
+        glow.animate().scaleX(1.2f).scaleY(1.2f).alpha(1f).setStartDelay(250).setDuration(800).start();
 
-        title.setAlpha(0f); title.setTranslationY(20 * d);
+        title.setAlpha(0f); title.setTranslationY(24 * d);
         title.animate().alpha(1f).translationY(0).setStartDelay(450).setDuration(450)
                 .setInterpolator(new DecelerateInterpolator()).start();
 
         splash.postDelayed(() -> {
-            logo.animate().scaleX(2.4f).scaleY(2.4f).alpha(0f).setDuration(380).start();
-            title.animate().alpha(0f).setStartDelay(0).setDuration(200).start();
-            splash.animate().alpha(0f).setDuration(420).withEndAction(() -> splash.setVisibility(View.GONE)).start();
+            logo.animate().scaleX(0.6f).scaleY(0.6f).alpha(0f).setDuration(300).start();
+            title.animate().alpha(0f).translationY(-12 * d).setStartDelay(0).setDuration(250).start();
+            splash.animate().alpha(0f).setStartDelay(120).setDuration(380)
+                    .withEndAction(() -> splash.setVisibility(View.GONE)).start();
             for (int i = 0; i < content.getChildCount(); i++) {
                 content.getChildAt(i).animate().alpha(1f).translationY(0)
-                        .setStartDelay(150 + i * 60L).setDuration(500)
-                        .setInterpolator(new DecelerateInterpolator(2f)).start();
+                        .setStartDelay(200 + i * 55L).setDuration(520)
+                        .setInterpolator(new DecelerateInterpolator(2.2f)).start();
             }
+            bar.animate().translationY(0).setStartDelay(450).setDuration(600)
+                    .setInterpolator(new OvershootInterpolator(1.1f)).start();
         }, 1500);
     }
 
@@ -113,12 +123,32 @@ public class MainActivity extends Activity {
         v.setOnClickListener(x -> r.run());
     }
 
+    private void paste() {
+        startActivity(new Intent(this, ClipActivity.class));
+    }
+
     private void openTikTok() {
-        for (String p : new String[]{"com.zhiliaoapp.musically", "com.ss.android.ugc.trill"}) {
+        for (String p : new String[]{"com.zhiliaoapp.musically", "com.ss.android.ugc.trill", "com.zhiliaoapp.musically.go"}) {
             Intent i = getPackageManager().getLaunchIntentForPackage(p);
             if (i != null) { startActivity(i); return; }
         }
-        Toast.makeText(this, "TikTok n'est pas installé", Toast.LENGTH_SHORT).show();
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com")));
+        } catch (Exception e) {
+            Toast.makeText(this, "Impossible d'ouvrir TikTok", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void countUp(TextView t, int to) {
+        int from;
+        try { from = Integer.parseInt(t.getText().toString()); } catch (Exception e) { from = 0; }
+        if (from == to) return;
+        ValueAnimator a = ValueAnimator.ofInt(from, to);
+        a.setDuration(900);
+        a.setStartDelay(findViewById(R.id.splash).getVisibility() == View.VISIBLE ? 1700 : 0);
+        a.setInterpolator(new DecelerateInterpolator(2f));
+        a.addUpdateListener(x -> t.setText(String.valueOf(x.getAnimatedValue())));
+        a.start();
     }
 
     @Override
@@ -126,14 +156,19 @@ public class MainActivity extends Activity {
         super.onResume();
         String en = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         boolean on = en != null && en.contains(getPackageName());
-        int c = on ? GREEN : RED;
+        int c = on ? 0xFF2BD67B : 0xFFFF453A;
         statusDot.setBackgroundTintList(ColorStateList.valueOf(c));
         statusPulse.setBackgroundTintList(ColorStateList.valueOf(c));
-        statusTitle.setText(on ? "Prêt à télécharger" : "Service désactivé");
-        statusSub.setText(on ? "La bulle apparaît sur TikTok" : "Termine la configuration ci-dessous");
+        statusTitle.setText(on ? "Bulle active sur TikTok" : "Service désactivé — termine la configuration");
         for (TextView bdg : new TextView[]{badge1, badge2}) {
-            bdg.setBackgroundTintList(on ? ColorStateList.valueOf(GREEN) : null);
+            bdg.setBackgroundTintList(on ? ColorStateList.valueOf(0xFFF2F2F2) : null);
+            bdg.setTextColor(on ? 0xFF000000 : 0xFFFFFFFF);
             bdg.setText(on ? "✓" : (bdg == badge1 ? "1" : "2"));
         }
+
+        SharedPreferences s = getSharedPreferences("stats", MODE_PRIVATE);
+        String day = new SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(new Date());
+        countUp(total, s.getInt("total", 0));
+        countUp(today, day.equals(s.getString("day", "")) ? s.getInt("today", 0) : 0);
     }
 }

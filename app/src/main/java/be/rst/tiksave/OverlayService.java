@@ -66,18 +66,27 @@ public class OverlayService extends AccessibilityService {
         if (e.getPackageName() == null) return;
         String p = e.getPackageName().toString();
         int t = e.getEventType();
-        if (t == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (TIKTOK.contains(p)) { show(); scheduleAnchor(350); }
-            else if (!busy && !ignored(p)) hide();
-        } else if (t == AccessibilityEvent.TYPE_VIEW_SCROLLED && TIKTOK.contains(p) && bubble != null) {
-            scheduleAnchor(450);
+        if (t == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+            if (TIKTOK.contains(p) && bubble != null) scheduleAnchor(450);
+        } else {
+            h.removeCallbacks(visTask);
+            h.postDelayed(visTask, 200);
         }
     }
 
-    private boolean ignored(String p) {
-        if (p.equals(getPackageName()) || p.equals("com.android.systemui")) return true;
-        String ime = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
-        return ime != null && ime.startsWith(p + "/");
+    private final Runnable visTask = this::updateVisibility;
+
+    private void updateVisibility() {
+        if (busy) return;
+        String top = null;
+        for (AccessibilityWindowInfo w : getWindows()) {
+            if (w.getType() != AccessibilityWindowInfo.TYPE_APPLICATION || !(w.isActive() || w.isFocused())) continue;
+            AccessibilityNodeInfo r = w.getRoot();
+            if (r != null && r.getPackageName() != null) { top = r.getPackageName().toString(); break; }
+        }
+        if (top == null || top.equals(getPackageName())) return;
+        if (TIKTOK.contains(top)) { show(); scheduleAnchor(350); }
+        else hide();
     }
 
     @Override
@@ -206,13 +215,31 @@ public class OverlayService extends AccessibilityService {
 
     // ---------- Capture ----------
 
+    private android.widget.ImageView cover;
+
     private void capture() {
         if (busy || bubble == null) return;
         busy = true;
         bubble.setState(BubbleView.BUSY);
         h.postDelayed(() -> {
+            hideCover();
             if (busy) { busy = false; if (bubble != null) bubble.setState(BubbleView.IDLE); }
         }, 15000);
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            takeScreenshot(android.view.Display.DEFAULT_DISPLAY, getMainExecutor(), new TakeScreenshotCallback() {
+                @Override
+                public void onSuccess(ScreenshotResult r) {
+                    android.graphics.Bitmap bmp = android.graphics.Bitmap.wrapHardwareBuffer(r.getHardwareBuffer(), r.getColorSpace());
+                    showCover(bmp);
+                    runFlow();
+                }
+                @Override
+                public void onFailure(int code) { runFlow(); }
+            });
+        } else runFlow();
+    }
+
+    private void runFlow() {
         waitFor(this::findShare, 8, share -> {
             tap(share);
             waitFor(this::findCopy, 12, copy -> {
@@ -221,12 +248,52 @@ public class OverlayService extends AccessibilityService {
                     Intent i = new Intent(this, ClipActivity.class);
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
                     startActivity(i);
-                }, 700);
-            }, () -> fail("« Copier le lien » introuvable"));
+                    h.postDelayed(this::hideCover, 500);
+                }, 600);
+            }, () -> { pressBack(); fail("« Copier le lien » introuvable"); });
         }, () -> fail("Bouton Partager introuvable"));
     }
 
+    private void pressBack() {
+        performGlobalAction(GLOBAL_ACTION_BACK);
+    }
+
+    @android.annotation.TargetApi(30)
+    private void showCover(android.graphics.Bitmap bmp) {
+        if (bmp == null || cover != null) return;
+        cover = new android.widget.ImageView(this);
+        cover.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+        cover.setImageBitmap(bmp);
+        WindowManager.LayoutParams c = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.OPAQUE);
+        c.gravity = Gravity.TOP | Gravity.START;
+        android.graphics.Rect b = wm.getMaximumWindowMetrics().getBounds();
+        c.width = b.width();
+        c.height = b.height();
+        if (android.os.Build.VERSION.SDK_INT >= 30)
+            c.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        wm.addView(cover, c);
+        if (bubble != null) {
+            try { wm.removeViewImmediate(bubble); wm.addView(bubble, lp); } catch (Exception ignored) {}
+        }
+    }
+
+    private void hideCover() {
+        if (cover == null) return;
+        android.widget.ImageView v = cover;
+        cover = null;
+        v.animate().alpha(0f).setDuration(150)
+                .withEndAction(() -> { try { wm.removeView(v); } catch (Exception ignored) {} }).start();
+    }
+
     private void fail(String m) {
+        hideCover();
         busy = false;
         if (bubble != null) bubble.setState(BubbleView.ERR);
         Toast.makeText(this, m, Toast.LENGTH_SHORT).show();

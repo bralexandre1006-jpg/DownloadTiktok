@@ -69,6 +69,10 @@ public class Downloader {
                     enqueue(dm, abs(v), Environment.DIRECTORY_MOVIES, "TikTok/" + id + ".mp4");
                     toast(h, c, "Téléchargement lancé ✔");
                 }
+                android.content.SharedPreferences s = c.getSharedPreferences("stats", Context.MODE_PRIVATE);
+                String day = new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT).format(new java.util.Date());
+                int td = day.equals(s.getString("day", "")) ? s.getInt("today", 0) : 0;
+                s.edit().putInt("total", s.getInt("total", 0) + 1).putString("day", day).putInt("today", td + 1).apply();
                 result(true);
             } catch (Exception e) {
                 toast(h, c, "Échec : " + e.getMessage());

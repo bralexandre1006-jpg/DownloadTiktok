@@ -46,7 +46,7 @@ public class BubbleView extends View {
         r = Math.min(w, h) * 0.40f;
         stroke = r * 0.14f;
         ring.setStrokeWidth(stroke);
-        ring.setShader(new SweepGradient(cx, cy, new int[]{CYAN, PINK, 0xFFA83CFF, CYAN}, null));
+        ring.setShader(new SweepGradient(cx, cy, new int[]{0xFFFFFFFF, 0xFF6E6E6E, 0xFFFFFFFF}, null));
         float in = r * 0.62f;
         dst.set(cx - in, cy - in, cx + in, cy + in);
     }
