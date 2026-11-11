@@ -222,7 +222,7 @@ public class OverlayService extends AccessibilityService {
         bubble.setState(BubbleView.BUSY);
         h.postDelayed(() -> {
             if (busy) { busy = false; if (bubble != null) bubble.setState(BubbleView.IDLE); }
-        }, 40000);
+        }, 20000);
         Downloader.log(this, "tap bulle, fenêtres TikTok=" + roots().size());
 
         DisplayMetrics dm = getResources().getDisplayMetrics();
@@ -271,11 +271,10 @@ public class OverlayService extends AccessibilityService {
                 Downloader.log(this, "copier le lien trouvé");
                 tap(copy);
                 h.postDelayed(() -> {
-                    if (findCopy() != null) performGlobalAction(GLOBAL_ACTION_BACK);
                     Intent i = new Intent(this, ClipActivity.class);
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
                     startActivity(i);
-                }, 350);
+                }, 700);
             }, () -> {
                 saveSheetDump();
                 performGlobalAction(GLOBAL_ACTION_BACK);
