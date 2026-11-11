@@ -2,23 +2,27 @@ package be.rst.tiksave;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.animation.ValueAnimator;
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Color;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.graphics.Rect;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
-import android.widget.TextView;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -31,29 +35,43 @@ public class OverlayService extends AccessibilityService {
     private static final Set<String> TIKTOK = new HashSet<>(Arrays.asList(
             "com.zhiliaoapp.musically", "com.ss.android.ugc.trill",
             "com.zhiliaoapp.musically.go", "com.ss.android.ugc.aweme"));
-    private static final int RED = 0xDDFE2C55, GREY = 0xDD777777;
 
     private final Handler h = new Handler(Looper.getMainLooper());
+    private final Runnable anchorTask = this::anchor;
     private WindowManager wm;
-    private TextView bubble;
+    private SharedPreferences sp;
+    private BubbleView bubble;
     private WindowManager.LayoutParams lp;
-    private GradientDrawable bg;
+    private ValueAnimator moveAnim;
     private boolean busy;
+    private int size;
 
     interface Finder { AccessibilityNodeInfo find(); }
     interface Found { void on(AccessibilityNodeInfo n); }
+    interface Match { boolean ok(AccessibilityNodeInfo n); }
 
     @Override
     protected void onServiceConnected() {
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+        sp = getSharedPreferences("pos", MODE_PRIVATE);
+        size = dp(46);
+        Downloader.listener = ok -> {
+            if (bubble != null) bubble.setState(ok ? BubbleView.OK : BubbleView.ERR);
+            busy = false;
+        };
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
-        if (e.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || e.getPackageName() == null) return;
+        if (e.getPackageName() == null) return;
         String p = e.getPackageName().toString();
-        if (TIKTOK.contains(p)) show();
-        else if (!busy && !ignored(p)) hide();
+        int t = e.getEventType();
+        if (t == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if (TIKTOK.contains(p)) { show(); scheduleAnchor(350); }
+            else if (!busy && !ignored(p)) hide();
+        } else if (t == AccessibilityEvent.TYPE_VIEW_SCROLLED && TIKTOK.contains(p) && bubble != null) {
+            scheduleAnchor(450);
+        }
     }
 
     private boolean ignored(String p) {
@@ -67,6 +85,7 @@ public class OverlayService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        Downloader.listener = null;
         hide();
         super.onDestroy();
     }
@@ -75,69 +94,125 @@ public class OverlayService extends AccessibilityService {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
+    // ---------- Bulle ----------
+
     private void show() {
         if (bubble != null) return;
-        int s = dp(52);
-        bubble = new TextView(this);
-        bubble.setText("⬇");
-        bubble.setTextSize(22);
-        bubble.setTextColor(Color.WHITE);
-        bubble.setGravity(Gravity.CENTER);
-        bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.OVAL);
-        bg.setColor(RED);
-        bg.setStroke(dp(2), Color.WHITE);
-        bubble.setBackground(bg);
-        bubble.setElevation(dp(6));
-
-        lp = new WindowManager.LayoutParams(s, s,
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        bubble = new BubbleView(this);
+        lp = new WindowManager.LayoutParams(size, size,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.START;
-        SharedPreferences sp = getSharedPreferences("pos", MODE_PRIVATE);
-        lp.x = sp.getInt("x", getResources().getDisplayMetrics().widthPixels - s - dp(10));
-        lp.y = sp.getInt("y", dp(180));
-
-        bubble.setOnTouchListener(new android.view.View.OnTouchListener() {
-            float dx, dy; int sx, sy; boolean moved;
-            @Override
-            public boolean onTouch(android.view.View v, MotionEvent ev) {
-                switch (ev.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        dx = ev.getRawX(); dy = ev.getRawY(); sx = lp.x; sy = lp.y; moved = false;
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        int mx = (int) (ev.getRawX() - dx), my = (int) (ev.getRawY() - dy);
-                        if (Math.abs(mx) > dp(6) || Math.abs(my) > dp(6)) moved = true;
-                        if (moved) { lp.x = sx + mx; lp.y = sy + my; wm.updateViewLayout(bubble, lp); }
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        if (moved) getSharedPreferences("pos", MODE_PRIVATE).edit().putInt("x", lp.x).putInt("y", lp.y).apply();
-                        else capture();
-                        return true;
-                }
-                return false;
-            }
-        });
+        lp.x = sp.getInt("x", dm.widthPixels - size - dp(14));
+        lp.y = sp.getInt("y", (int) (dm.heightPixels * 0.42f));
+        bubble.setOnTouchListener(new Drag());
         wm.addView(bubble, lp);
+        bubble.setScaleX(0f);
+        bubble.setScaleY(0f);
+        BubbleView b = bubble;
+        b.animate().scaleX(1f).scaleY(1f).setInterpolator(new OvershootInterpolator(2.5f))
+                .setDuration(380).withEndAction(b::startBreathing).start();
     }
 
     private void hide() {
         if (bubble == null) return;
-        try { wm.removeView(bubble); } catch (Exception ignored) {}
+        BubbleView b = bubble;
         bubble = null;
+        if (moveAnim != null) moveAnim.cancel();
+        b.stopAll();
+        b.animate().scaleX(0f).scaleY(0f).setDuration(180)
+                .withEndAction(() -> { try { wm.removeView(b); } catch (Exception ignored) {} }).start();
     }
 
-    private void setBusy(boolean b) {
-        busy = b;
-        if (bg != null) bg.setColor(b ? GREY : RED);
+    private void moveTo(int x, int y) {
+        if (bubble == null) return;
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int tx = Math.max(0, Math.min(x, dm.widthPixels - size));
+        int ty = Math.max(dp(24), Math.min(y, dm.heightPixels - size - dp(24)));
+        if (moveAnim != null) moveAnim.cancel();
+        int fx = lp.x, fy = lp.y;
+        if (fx == tx && fy == ty) return;
+        moveAnim = ValueAnimator.ofFloat(0f, 1f);
+        moveAnim.setDuration(380);
+        moveAnim.setInterpolator(new DecelerateInterpolator(2f));
+        moveAnim.addUpdateListener(a -> {
+            if (bubble == null) { a.cancel(); return; }
+            float f = (float) a.getAnimatedValue();
+            lp.x = (int) (fx + (tx - fx) * f);
+            lp.y = (int) (fy + (ty - fy) * f);
+            try { wm.updateViewLayout(bubble, lp); } catch (Exception ignored) {}
+        });
+        moveAnim.start();
     }
+
+    private void scheduleAnchor(long delay) {
+        h.removeCallbacks(anchorTask);
+        h.postDelayed(anchorTask, delay);
+    }
+
+    private void anchor() {
+        if (bubble == null || busy || sp.getBoolean("custom", false)) return;
+        Point a = anchorPoint();
+        if (a != null) moveTo(a.x, a.y);
+    }
+
+    private Point anchorPoint() {
+        AccessibilityNodeInfo n = findAvatar();
+        if (n == null) return null;
+        Rect r = new Rect();
+        n.getBoundsInScreen(r);
+        return new Point(r.centerX() - size / 2, r.top - size - dp(6));
+    }
+
+    private class Drag implements android.view.View.OnTouchListener {
+        float dx, dy; int sx, sy; boolean moved;
+
+        @SuppressLint("ClickableViewAccessibility")
+        @Override
+        public boolean onTouch(android.view.View v, MotionEvent ev) {
+            switch (ev.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    if (moveAnim != null) moveAnim.cancel();
+                    dx = ev.getRawX(); dy = ev.getRawY(); sx = lp.x; sy = lp.y; moved = false;
+                    bubble.press(true);
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    int mx = (int) (ev.getRawX() - dx), my = (int) (ev.getRawY() - dy);
+                    if (Math.abs(mx) > dp(6) || Math.abs(my) > dp(6)) moved = true;
+                    if (moved) { lp.x = sx + mx; lp.y = sy + my; wm.updateViewLayout(bubble, lp); }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    bubble.press(false);
+                    if (!moved) { capture(); return true; }
+                    Point a = anchorPoint();
+                    if (a != null && Math.hypot(lp.x - a.x, lp.y - a.y) < dp(90)) {
+                        sp.edit().putBoolean("custom", false).putInt("x", a.x).putInt("y", a.y).apply();
+                        bubble.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                        moveTo(a.x, a.y);
+                    } else {
+                        sp.edit().putBoolean("custom", true).putInt("x", lp.x).putInt("y", lp.y).apply();
+                        moveTo(lp.x, lp.y);
+                    }
+                    return true;
+            }
+            return false;
+        }
+    }
+
+    // ---------- Capture ----------
 
     private void capture() {
-        if (busy) return;
-        setBusy(true);
-        h.postDelayed(() -> setBusy(false), 6000);
+        if (busy || bubble == null) return;
+        busy = true;
+        bubble.setState(BubbleView.BUSY);
+        h.postDelayed(() -> {
+            if (busy) { busy = false; if (bubble != null) bubble.setState(BubbleView.IDLE); }
+        }, 15000);
         waitFor(this::findShare, 8, share -> {
             tap(share);
             waitFor(this::findCopy, 12, copy -> {
@@ -146,14 +221,14 @@ public class OverlayService extends AccessibilityService {
                     Intent i = new Intent(this, ClipActivity.class);
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
                     startActivity(i);
-                    h.postDelayed(() -> setBusy(false), 1500);
                 }, 700);
             }, () -> fail("« Copier le lien » introuvable"));
         }, () -> fail("Bouton Partager introuvable"));
     }
 
     private void fail(String m) {
-        setBusy(false);
+        busy = false;
+        if (bubble != null) bubble.setState(BubbleView.ERR);
         Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
     }
 
@@ -179,34 +254,43 @@ public class OverlayService extends AccessibilityService {
         return c == null ? "" : c.toString().toLowerCase();
     }
 
-    private AccessibilityNodeInfo findShare() {
-        int half = getResources().getDisplayMetrics().widthPixels / 2;
+    private AccessibilityNodeInfo findFirst(Match m) {
         for (AccessibilityNodeInfo root : roots()) {
-            AccessibilityNodeInfo n = search(root, node -> {
-                String d = low(node.getContentDescription());
-                if (!(d.contains("partag") || d.contains("share"))) return false;
-                Rect b = new Rect(); node.getBoundsInScreen(b);
-                return b.centerX() > half && b.width() > 0;
-            });
+            AccessibilityNodeInfo n = search(root, m);
             if (n != null) return n;
         }
         return null;
+    }
+
+    private AccessibilityNodeInfo findAvatar() {
+        int w = getResources().getDisplayMetrics().widthPixels;
+        return findFirst(node -> {
+            String d = low(node.getContentDescription());
+            if (!(d.contains("profil") || d.contains("profile") || d.contains("avatar"))) return false;
+            Rect b = new Rect(); node.getBoundsInScreen(b);
+            return b.centerX() > w * 0.7f && b.width() >= dp(28) && b.width() <= dp(90)
+                    && Math.abs(b.width() - b.height()) < dp(14);
+        });
+    }
+
+    private AccessibilityNodeInfo findShare() {
+        int half = getResources().getDisplayMetrics().widthPixels / 2;
+        return findFirst(node -> {
+            String d = low(node.getContentDescription());
+            if (!(d.contains("partag") || d.contains("share"))) return false;
+            Rect b = new Rect(); node.getBoundsInScreen(b);
+            return b.centerX() > half && b.width() > 0;
+        });
     }
 
     private AccessibilityNodeInfo findCopy() {
-        for (AccessibilityNodeInfo root : roots()) {
-            AccessibilityNodeInfo n = search(root, node -> {
-                String t = low(node.getText()) + "|" + low(node.getContentDescription());
-                if (!(t.contains("copier le lien") || t.contains("copy link") || t.contains("copier lien"))) return false;
-                Rect b = new Rect(); node.getBoundsInScreen(b);
-                return b.width() > 0;
-            });
-            if (n != null) return n;
-        }
-        return null;
+        return findFirst(node -> {
+            String t = low(node.getText()) + "|" + low(node.getContentDescription());
+            if (!(t.contains("copier le lien") || t.contains("copy link") || t.contains("copier lien"))) return false;
+            Rect b = new Rect(); node.getBoundsInScreen(b);
+            return b.width() > 0;
+        });
     }
-
-    interface Match { boolean ok(AccessibilityNodeInfo n); }
 
     private AccessibilityNodeInfo search(AccessibilityNodeInfo n, Match m) {
         if (n == null) return null;

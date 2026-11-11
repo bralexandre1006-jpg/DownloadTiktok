@@ -37,7 +37,10 @@ public class ClipActivity extends Activity {
 
     private void handle(String text) {
         String url = Downloader.extractUrl(text);
-        if (url == null) Toast.makeText(this, "Aucun lien TikTok trouvé", Toast.LENGTH_SHORT).show();
+        if (url == null) {
+            Toast.makeText(this, "Aucun lien TikTok trouvé", Toast.LENGTH_SHORT).show();
+            Downloader.result(false);
+        }
         else Downloader.start(this, url);
         finish();
         overridePendingTransition(0, 0);

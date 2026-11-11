@@ -23,6 +23,13 @@ public class Downloader {
     private static final Pattern TT = Pattern.compile("https?://[^\\s]*tiktok\\.com[^\\s]*");
     private static final String UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124 Mobile Safari/537.36";
 
+    public interface Listener { void done(boolean ok); }
+    public static Listener listener;
+
+    static void result(boolean ok) {
+        new Handler(Looper.getMainLooper()).post(() -> { if (listener != null) listener.done(ok); });
+    }
+
     public static String extractUrl(String t) {
         if (t == null) return null;
         Matcher m = TT.matcher(t);
@@ -62,8 +69,10 @@ public class Downloader {
                     enqueue(dm, abs(v), Environment.DIRECTORY_MOVIES, "TikTok/" + id + ".mp4");
                     toast(h, c, "Téléchargement lancé ✔");
                 }
+                result(true);
             } catch (Exception e) {
                 toast(h, c, "Échec : " + e.getMessage());
+                result(false);
             }
         }).start();
     }
