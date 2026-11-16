@@ -65,12 +65,11 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
+                    android:fontFamily="@font/inter_extrabold"
                     android:letterSpacing="-0.02"
                     android:text="TikSave"
                     android:textColor="#FFFFFF"
-                    android:textSize="36sp"
-                    android:textStyle="bold" />
+                    android:textSize="36sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -100,13 +99,12 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:fontFamily="sans-serif-medium"
+                        android:fontFamily="@font/inter_extrabold"
                         android:includeFontPadding="false"
                         android:letterSpacing="-0.04"
                         android:text="0"
                         android:textColor="#FFFFFF"
-                        android:textSize="76sp"
-                        android:textStyle="bold" />
+                        android:textSize="76sp" />
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -121,20 +119,20 @@
 
                         <TextView
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/inter_bold"
+                    android:layout_height="wrap_content"
                             android:text="+"
                             android:textColor="#FFFFFF"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
+                            android:textSize="14sp" />
 
                         <TextView
                             android:id="@+id/today"
                             android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/inter_bold"
+                    android:layout_height="wrap_content"
                             android:text="0"
                             android:textColor="#FFFFFF"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
+                            android:textSize="14sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -184,7 +182,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
-                        android:fontFamily="sans-serif-medium"
+                        android:fontFamily="@font/inter_bold"
                         android:textColor="#E6FFFFFF"
                         android:textSize="14sp" />
                 </LinearLayout>
@@ -288,12 +286,11 @@ ou copie le lien puis appuie sur Coller."
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_pill"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="@font/inter_bold"
                 android:gravity="center"
                 android:text="Coller un lien"
                 android:textColor="#000000"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textSize="18sp" />
         </FrameLayout>
     </FrameLayout>
 

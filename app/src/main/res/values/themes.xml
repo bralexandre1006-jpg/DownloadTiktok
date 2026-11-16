@@ -5,6 +5,7 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:colorAccent">@color/pink</item>
+        <item name="android:fontFamily">@font/inter_semibold</item>
     </style>
     <style name="GlassApp">
         <item name="android:layout_width">0dp</item>
@@ -12,7 +13,7 @@
         <item name="android:layout_weight">1</item>
         <item name="android:background">@drawable/bg_glass_app</item>
         <item name="android:gravity">center</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:fontFamily">@font/inter_bold</item>
         <item name="android:textColor">#FFFFFF</item>
         <item name="android:textSize">15sp</item>
     </style>
