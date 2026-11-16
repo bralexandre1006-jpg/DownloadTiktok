@@ -199,13 +199,23 @@ public class Downloader {
         String sc = m.group(1);
         List<String[]> out = new ArrayList<>();
         try {
+            String cookies = igCookies();
+            String csrf = "";
+            Matcher cm = Pattern.compile("csrftoken=([^;]+)").matcher(cookies);
+            if (cm.find()) csrf = cm.group(1);
             String vars = URLEncoder.encode("{\"shortcode\":\"" + sc + "\"}", "UTF-8");
             JSONObject j = new JSONObject(http("https://www.instagram.com/graphql/query",
                     "doc_id=8845758582119845&variables=" + vars,
                     "Content-Type", "application/x-www-form-urlencoded",
                     "X-IG-App-ID", "936619743392459",
                     "X-FB-Friendly-Name", "PolarisPostActionLoadPostQueryQuery",
-                    "Referer", "https://www.instagram.com/"));
+                    "X-CSRFToken", csrf,
+                    "X-Requested-With", "XMLHttpRequest",
+                    "X-ASBD-ID", "129477",
+                    "X-IG-WWW-Claim", "0",
+                    "Cookie", cookies,
+                    "Origin", "https://www.instagram.com",
+                    "Referer", "https://www.instagram.com/p/" + sc + "/"));
             JSONObject node = j.getJSONObject("data").optJSONObject("xdt_shortcode_media");
             if (node != null) {
                 JSONObject side = node.optJSONObject("edge_sidecar_to_children");
@@ -229,8 +239,32 @@ public class Downloader {
             }
             log(c, "insta embed: " + out.size() + " média(s)");
         }
+        if (out.isEmpty()) {
+            String w = WebGrab.grab(c, "https://www.instagram.com/p/" + sc + "/embed/captioned/");
+            log(c, "insta webview: " + (w == null ? "rien" : w.substring(0, Math.min(120, w.length()))));
+            if (w != null && w.startsWith("V")) out.add(item(w.substring(1), false, "Instagram/" + sc + ".mp4"));
+            else if (w != null && w.startsWith("P")) out.add(item(w.substring(1), true, "Instagram/" + sc + ".jpg"));
+        }
         if (out.isEmpty()) throw new Exception("post privé ou introuvable");
         return out;
+    }
+
+    private static String igCookies() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            HttpURLConnection con = (HttpURLConnection) new URL("https://www.instagram.com/").openConnection();
+            con.setRequestProperty("User-Agent", UA);
+            con.setConnectTimeout(10000);
+            con.setReadTimeout(10000);
+            con.getResponseCode();
+            List<String> sc = con.getHeaderFields().get("Set-Cookie");
+            if (sc != null) for (String k : sc) {
+                String kv = k.split(";", 2)[0];
+                if (!kv.endsWith("=") && !kv.contains("=\"\"")) sb.append(sb.length() > 0 ? "; " : "").append(kv);
+            }
+            con.disconnect();
+        } catch (Exception ignored) {}
+        return sb.toString();
     }
 
     private static void igNode(List<String[]> out, JSONObject n, String sc, int i, int total) {
