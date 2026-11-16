@@ -2,11 +2,45 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="#05050A">
+
+    <!-- Fond : orbes colorées floues -->
+    <FrameLayout
+        android:id="@+id/orbs"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <View
+            android:id="@+id/orb1"
+            android:layout_width="460dp"
+            android:layout_height="460dp"
+            android:layout_gravity="top|start"
+            android:layout_marginStart="-180dp"
+            android:layout_marginTop="-120dp"
+            android:background="@drawable/bg_orb_pink" />
+
+        <View
+            android:id="@+id/orb2"
+            android:layout_width="440dp"
+            android:layout_height="440dp"
+            android:layout_gravity="center_vertical|end"
+            android:layout_marginEnd="-200dp"
+            android:background="@drawable/bg_orb_cyan" />
+
+        <View
+            android:id="@+id/orb3"
+            android:layout_width="480dp"
+            android:layout_height="480dp"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="-160dp"
+            android:layout_marginBottom="-160dp"
+            android:background="@drawable/bg_orb_violet" />
+    </FrameLayout>
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
         android:overScrollMode="never"
         android:scrollbars="none">
 
@@ -15,72 +49,115 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingLeft="14dp"
+            android:paddingLeft="16dp"
             android:paddingTop="56dp"
-            android:paddingRight="14dp"
+            android:paddingRight="16dp"
             android:paddingBottom="130dp">
 
-            <!-- Header -->
+            <!-- En-tête -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:paddingLeft="10dp"
-                android:paddingRight="6dp"
-                android:paddingBottom="18dp">
+                android:orientation="vertical"
+                android:paddingLeft="6dp"
+                android:paddingBottom="20dp">
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="sans-serif-condensed"
-                    android:letterSpacing="-0.03"
-                    android:text="TIKSAVE"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="-0.02"
+                    android:text="TikSave"
                     android:textColor="#FFFFFF"
-                    android:textSize="32sp"
+                    android:textSize="36sp"
                     android:textStyle="bold" />
 
-                <ImageView
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:alpha="0.55"
-                    android:src="@drawable/logo" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="TikTok · Instagram · X"
+                    android:textColor="#99FFFFFF"
+                    android:textSize="15sp" />
             </LinearLayout>
 
-            <!-- Hero -->
+            <!-- Compteurs -->
             <LinearLayout
                 android:id="@+id/hero"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_card"
+                android:background="@drawable/bg_glass"
                 android:orientation="vertical"
                 android:padding="24dp">
 
-                <TextView
-                    android:id="@+id/total"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-condensed"
-                    android:includeFontPadding="false"
-                    android:letterSpacing="-0.04"
-                    android:text="0"
-                    android:textColor="#FFFFFF"
-                    android:textSize="88sp"
-                    android:textStyle="bold" />
+                    android:gravity="bottom">
+
+                    <TextView
+                        android:id="@+id/total"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="sans-serif-medium"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="-0.04"
+                        android:text="0"
+                        android:textColor="#FFFFFF"
+                        android:textSize="76sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_glass_chip"
+                        android:gravity="center_vertical"
+                        android:paddingLeft="12dp"
+                        android:paddingTop="6dp"
+                        android:paddingRight="12dp"
+                        android:paddingBottom="6dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="+"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/today"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="#FFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="aujourd'hui"
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/totalSub"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="vidéos téléchargées au total"
-                    android:textColor="#8C8C8C"
+                    android:layout_marginTop="2dp"
+                    android:text="téléchargements"
+                    android:textColor="#99FFFFFF"
                     android:textSize="16sp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
+                    android:layout_marginTop="20dp"
                     android:gravity="center_vertical">
 
                     <FrameLayout
@@ -108,152 +185,75 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:fontFamily="sans-serif-medium"
-                        android:textColor="#FFFFFF"
+                        android:textColor="#E6FFFFFF"
                         android:textSize="14sp" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Two small cards -->
+            <!-- Ouvrir une app -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp">
+                android:layout_marginTop="12dp">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="5dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_card"
-                    android:orientation="vertical"
-                    android:padding="22dp">
+                <TextView
+                    android:id="@+id/openTikTok"
+                    style="@style/GlassApp"
+                    android:layout_marginEnd="6dp"
+                    android:text="TikTok" />
 
-                    <TextView
-                        android:id="@+id/today"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="sans-serif-condensed"
-                        android:includeFontPadding="false"
-                        android:text="0"
-                        android:textColor="#FFFFFF"
-                        android:textSize="44sp"
-                        android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/openInsta"
+                    style="@style/GlassApp"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:text="Instagram" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="aujourd'hui"
-                        android:textColor="#8C8C8C"
-                        android:textSize="15sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/pasteCard"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="5dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_card"
-                    android:orientation="vertical"
-                    android:padding="22dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_pill"
-                        android:fontFamily="sans-serif-medium"
-                        android:paddingLeft="14dp"
-                        android:paddingTop="6dp"
-                        android:paddingRight="14dp"
-                        android:paddingBottom="6dp"
-                        android:text="Coller"
-                        android:textColor="#000000"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:text="Télécharger un lien copié"
-                        android:textColor="#8C8C8C"
-                        android:textSize="15sp" />
-                </LinearLayout>
+                <TextView
+                    android:id="@+id/openX"
+                    style="@style/GlassApp"
+                    android:layout_marginStart="6dp"
+                    android:text="X" />
             </LinearLayout>
 
-            <LinearLayout
+            <!-- Mode d'emploi -->
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_card"
-                android:orientation="vertical"
-                android:padding="22dp">
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_glass"
+                android:lineSpacingExtra="4dp"
+                android:padding="22dp"
+                android:text="Partager → TikSave depuis l'app,
+ou copie le lien puis appuie sur Coller."
+                android:textColor="#B3FFFFFF"
+                android:textSize="15sp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Comment télécharger"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:lineSpacingExtra="4dp"
-                    android:text="1. Sur TikTok, appuie sur Partager\n2. Choisis Plus / Autres applis\n3. Sélectionne TikSave\n\nOu copie le lien puis appuie sur Coller."
-                    android:textColor="#8C8C8C"
-                    android:textSize="15sp" />
-            </LinearLayout>
-
+            <!-- Diagnostic -->
             <LinearLayout
                 android:id="@+id/diag"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_card"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_glass"
                 android:gravity="center_vertical"
-                android:padding="18dp">
+                android:paddingLeft="22dp"
+                android:paddingRight="18dp">
 
                 <TextView
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
-                    android:background="@drawable/bg_badge"
-                    android:gravity="center"
-                    android:text="⚙"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp" />
-
-                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
                     android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Diagnostic"
-                        android:textColor="#FFFFFF"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Voir et copier le dernier essai"
-                        android:textColor="#8C8C8C"
-                        android:textSize="14sp" />
-                </LinearLayout>
+                    android:text="Diagnostic"
+                    android:textColor="#E6FFFFFF"
+                    android:textSize="16sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="›"
-                    android:textColor="#FFFFFF"
-                    android:textSize="28sp" />
+                    android:textColor="#80FFFFFF"
+                    android:textSize="24sp" />
             </LinearLayout>
 
             <TextView
@@ -262,58 +262,40 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:gravity="center"
-                android:textColor="#444444"
+                android:textColor="#4DFFFFFF"
                 android:textSize="12sp" />
         </LinearLayout>
     </ScrollView>
 
-    <!-- Bottom bar -->
-    <LinearLayout
+    <!-- Dock -->
+    <FrameLayout
         android:id="@+id/bottomBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:gravity="center_vertical"
-        android:paddingLeft="14dp"
-        android:paddingRight="14dp"
-        android:paddingBottom="30dp">
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="24dp">
 
         <FrameLayout
-            android:layout_width="0dp"
-            android:layout_height="68dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_bar"
-            android:padding="7dp">
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_glass_dock"
+            android:padding="8dp">
 
             <TextView
-                android:id="@+id/openTikTok"
+                android:id="@+id/pasteBtn"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_pill"
+                android:fontFamily="sans-serif-medium"
                 android:gravity="center"
-                android:text="Ouvrir TikTok"
+                android:text="Coller un lien"
                 android:textColor="#000000"
                 android:textSize="18sp"
                 android:textStyle="bold" />
         </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/pasteBtn"
-            android:layout_width="68dp"
-            android:layout_height="68dp"
-            android:layout_marginStart="10dp"
-            android:background="@drawable/bg_round_white">
-
-            <ImageView
-                android:id="@+id/pasteIcon"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_gravity="center"
-                android:scaleType="centerCrop"
-                android:src="@drawable/logo"
-                android:tint="#000000" />
-        </FrameLayout>
-    </LinearLayout>
+    </FrameLayout>
 
     <!-- Splash -->
     <FrameLayout

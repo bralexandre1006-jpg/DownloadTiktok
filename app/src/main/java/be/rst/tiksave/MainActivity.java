@@ -31,8 +31,12 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        if (android.os.Build.VERSION.SDK_INT >= 29) getWindow().setNavigationBarContrastEnforced(false);
         setContentView(R.layout.activity_main);
+        applyInsets();
+        animateOrbs();
 
         statusTitle = findViewById(R.id.statusTitle);
         statusDot = findViewById(R.id.statusDot);
@@ -40,9 +44,11 @@ public class MainActivity extends Activity {
         total = findViewById(R.id.total);
         today = findViewById(R.id.today);
 
-        click(R.id.openTikTok, this::openTikTok);
+        click(R.id.openTikTok, () -> openApp("TikTok", "https://www.tiktok.com",
+                "com.zhiliaoapp.musically", "com.ss.android.ugc.trill", "com.zhiliaoapp.musically.go"));
+        click(R.id.openInsta, () -> openApp("Instagram", "https://www.instagram.com", "com.instagram.android"));
+        click(R.id.openX, () -> openApp("X", "https://x.com", "com.twitter.android"));
         click(R.id.pasteBtn, this::paste);
-        click(R.id.pasteCard, this::paste);
 
         click(R.id.diag, this::showDiag);
 
@@ -140,15 +146,51 @@ public class MainActivity extends Activity {
         startActivity(new Intent(this, ClipActivity.class));
     }
 
-    private void openTikTok() {
-        for (String p : new String[]{"com.zhiliaoapp.musically", "com.ss.android.ugc.trill", "com.zhiliaoapp.musically.go"}) {
+    private void openApp(String name, String web, String... pkgs) {
+        for (String p : pkgs) {
             Intent i = getPackageManager().getLaunchIntentForPackage(p);
             if (i != null) { startActivity(i); return; }
         }
         try {
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tiktok.com")));
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(web)));
         } catch (Exception e) {
-            Toast.makeText(this, "Impossible d'ouvrir TikTok", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Impossible d'ouvrir " + name, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void applyInsets() {
+        View content = findViewById(R.id.content), bar = findViewById(R.id.bottomBar);
+        float d = getResources().getDisplayMetrics().density;
+        int top = content.getPaddingTop(), bottom = content.getPaddingBottom(), barB = bar.getPaddingBottom();
+        findViewById(android.R.id.content).setOnApplyWindowInsetsListener((v, in) -> {
+            int t = in.getSystemWindowInsetTop(), nb = in.getSystemWindowInsetBottom();
+            if (android.os.Build.VERSION.SDK_INT >= 28 && in.getDisplayCutout() != null)
+                t = Math.max(t, in.getDisplayCutout().getSafeInsetTop());
+            content.setPadding(content.getPaddingLeft(), Math.max(top, t + (int) (20 * d)),
+                    content.getPaddingRight(), bottom + nb);
+            bar.setPadding(bar.getPaddingLeft(), bar.getPaddingTop(), bar.getPaddingRight(), barB + nb);
+            return in;
+        });
+    }
+
+    private void animateOrbs() {
+        View orbs = findViewById(R.id.orbs);
+        if (android.os.Build.VERSION.SDK_INT >= 31)
+            orbs.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(60f, 60f, android.graphics.Shader.TileMode.DECAL));
+        float d = getResources().getDisplayMetrics().density;
+        int[] ids = {R.id.orb1, R.id.orb2, R.id.orb3};
+        float[][] mv = {{60, 80}, {-70, 50}, {50, -70}};
+        for (int i = 0; i < ids.length; i++) {
+            ObjectAnimator a = ObjectAnimator.ofPropertyValuesHolder(findViewById(ids[i]),
+                    PropertyValuesHolder.ofFloat(View.TRANSLATION_X, 0, mv[i][0] * d),
+                    PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, 0, mv[i][1] * d),
+                    PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.15f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.15f));
+            a.setDuration(9000 + i * 2500L);
+            a.setRepeatCount(ValueAnimator.INFINITE);
+            a.setRepeatMode(ValueAnimator.REVERSE);
+            a.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            a.start();
         }
     }
 
