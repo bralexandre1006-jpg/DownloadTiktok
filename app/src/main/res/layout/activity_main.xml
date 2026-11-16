@@ -325,29 +325,17 @@
 
         <View
             android:id="@+id/splashGlow"
-            android:layout_width="300dp"
-            android:layout_height="300dp"
+            android:layout_width="420dp"
+            android:layout_height="420dp"
             android:layout_gravity="center"
             android:background="@drawable/bg_splash_glow" />
 
         <ImageView
             android:id="@+id/splashLogo"
-            android:layout_width="170dp"
-            android:layout_height="170dp"
+            android:layout_width="250dp"
+            android:layout_height="250dp"
             android:layout_gravity="center"
             android:src="@drawable/logo" />
 
-        <TextView
-            android:id="@+id/splashTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="150dp"
-            android:fontFamily="sans-serif-condensed"
-            android:letterSpacing="-0.02"
-            android:text="TIKSAVE"
-            android:textColor="#FFFFFF"
-            android:textSize="34sp"
-            android:textStyle="bold" />
     </FrameLayout>
 </FrameLayout>

@@ -39,7 +39,9 @@ public class ClipActivity extends Activity {
         Downloader.log(this, "presse-papier: " + (text == null ? "vide" : text.substring(0, Math.min(200, text.length()))));
         String url = Downloader.extractUrl(text);
         if (url == null) {
-            Toast.makeText(this, "Aucun lien TikTok, Instagram ou X trouvé", Toast.LENGTH_SHORT).show();
+            String t = text == null ? "presse-papier vide" : text.trim();
+            if (t.length() > 60) t = t.substring(0, 60) + "…";
+            Toast.makeText(this, "Aucun lien TikTok, Instagram ou X trouvé : " + t, Toast.LENGTH_LONG).show();
             Downloader.result(false);
         }
         else Downloader.start(this, url);

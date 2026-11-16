@@ -134,7 +134,7 @@ public class Downloader {
                 int td = day.equals(s.getString("day", "")) ? s.getInt("today", 0) : 0;
                 s.edit().putInt("total", s.getInt("total", 0) + 1).putString("day", day).putInt("today", td + 1).apply();
                 result(true);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 log(c, "erreur: " + e);
                 toast(h, c, "Échec : " + e.getMessage());
                 result(false);
@@ -216,7 +216,7 @@ public class Downloader {
                 } else igNode(out, node, sc, 0, 1);
             }
             log(c, "insta graphql: " + out.size() + " média(s)");
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log(c, "insta graphql erreur: " + e);
         }
         if (out.isEmpty()) {
@@ -240,7 +240,7 @@ public class Downloader {
     }
 
     private static String igField(String html, String key) {
-        Matcher m = Pattern.compile(key + "[\\\\\"]*:[\\\\\"]*(https:(?:[^\"\\\\]|\\\\+/|\\\\+u0026)+)").matcher(html);
+        Matcher m = Pattern.compile(key + "[\\\\\"]*:[\\\\\"]*(https:(?:[^\"\\\\]++|\\\\+/|\\\\+u0026)++)").matcher(html);
         if (!m.find()) return null;
         return m.group(1).replaceAll("\\\\+/", "/").replaceAll("\\\\+u0026", "&");
     }

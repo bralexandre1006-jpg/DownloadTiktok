@@ -65,7 +65,7 @@ public class MainActivity extends Activity {
 
     private void playSplash() {
         View splash = findViewById(R.id.splash), logo = findViewById(R.id.splashLogo),
-                glow = findViewById(R.id.splashGlow), title = findViewById(R.id.splashTitle),
+                glow = findViewById(R.id.splashGlow),
                 bar = findViewById(R.id.bottomBar);
         ViewGroup content = findViewById(R.id.content);
         float d = getResources().getDisplayMetrics().density;
@@ -84,13 +84,8 @@ public class MainActivity extends Activity {
         glow.setScaleX(0.3f); glow.setScaleY(0.3f); glow.setAlpha(0f);
         glow.animate().scaleX(1.2f).scaleY(1.2f).alpha(1f).setStartDelay(250).setDuration(800).start();
 
-        title.setAlpha(0f); title.setTranslationY(24 * d);
-        title.animate().alpha(1f).translationY(0).setStartDelay(450).setDuration(450)
-                .setInterpolator(new DecelerateInterpolator()).start();
-
         splash.postDelayed(() -> {
             logo.animate().scaleX(0.6f).scaleY(0.6f).alpha(0f).setDuration(300).start();
-            title.animate().alpha(0f).translationY(-12 * d).setStartDelay(0).setDuration(250).start();
             splash.animate().alpha(0f).setStartDelay(120).setDuration(380)
                     .withEndAction(() -> splash.setVisibility(View.GONE)).start();
             for (int i = 0; i < content.getChildCount(); i++) {
